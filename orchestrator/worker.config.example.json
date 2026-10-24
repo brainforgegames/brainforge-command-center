@@ -1,0 +1,28 @@
+{
+  "enabled": false,
+  "credentialMode": "firebase-cli",
+  "firebaseProjectId": "YOUR_FIREBASE_PROJECT_ID",
+  "codexExecutable": "codex.exe",
+  "maxRunMinutes": 25,
+  "publishPullRequests": false,
+  "projects": {
+    "sikhi-khoj": {
+      "path": "",
+      "repository": "brainforgegames/Sikhi_Khoj",
+      "baseBranch": "main",
+      "checks": []
+    },
+    "drivenix": {
+      "path": "",
+      "repository": "",
+      "baseBranch": "main",
+      "checks": []
+    },
+    "reflex-trainer": {
+      "path": "",
+      "repository": "",
+      "baseBranch": "main",
+      "checks": []
+    }
+  }
+}

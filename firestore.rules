@@ -1,0 +1,26 @@
+rules_version = '2';
+service cloud.firestore {
+ match /databases/{database}/documents {
+  function admin() { return request.auth != null && request.auth.uid == get(/databases/$(database)/documents/config/admin).data.uid; }
+  match /projects/{id} {
+   allow read: if admin();
+   allow update: if admin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['weight','enabled','instructions']) && request.resource.data.weight is int && request.resource.data.weight >= 0 && request.resource.data.weight <= 100 && request.resource.data.enabled is bool && request.resource.data.instructions is string && request.resource.data.instructions.size() <= 12000;
+  }
+  match /tasks/{id} {
+   allow read: if admin();
+   allow create: if admin() && request.resource.data.keys().hasOnly(['title','acceptance','projectId','priority','status','approved','createdAt']) && request.resource.data.title is string && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 180 && request.resource.data.acceptance is string && request.resource.data.acceptance.size() > 0 && request.resource.data.acceptance.size() <= 12000 && request.resource.data.projectId in ['sikhi-khoj','drivenix','reflex-trainer'] && request.resource.data.priority in [1,2,3] && request.resource.data.status == 'queued' && request.resource.data.approved == true && request.resource.data.createdAt is number;
+   allow update: if admin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','updatedAt']) && request.resource.data.status in ['queued','review','blocked','done'] && resource.data.status != 'running' && request.resource.data.updatedAt is number;
+  }
+  match /feedback/{id} {
+   allow read: if admin();
+   allow create: if admin() && request.resource.data.keys().hasOnly(['projectId','body','source','createdAt']) && request.resource.data.projectId in ['sikhi-khoj','drivenix','reflex-trainer'] && request.resource.data.body is string && request.resource.data.body.size() > 0 && request.resource.data.body.size() <= 8000 && request.resource.data.source is string && request.resource.data.source.size() <= 2000 && request.resource.data.createdAt is number;
+  }
+  match /settings/global {
+   allow read: if admin();
+   allow update: if admin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['instructions','workerEnabled']) && request.resource.data.instructions is string && request.resource.data.instructions.size() > 0 && request.resource.data.instructions.size() <= 12000 && request.resource.data.workerEnabled is bool;
+  }
+  match /reports/{id} { allow read: if admin(); }
+  match /worker/status { allow read: if admin(); }
+  match /{document=**} { allow read, write: if false; }
+ }
+}

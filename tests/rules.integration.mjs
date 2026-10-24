@@ -1,0 +1,85 @@
+import { readFile } from "node:fs/promises";
+import test, { before, after } from "node:test";
+import {
+  initializeTestEnvironment,
+  assertFails,
+  assertSucceeds,
+} from "@firebase/rules-unit-testing";
+import {
+  doc,
+  setDoc,
+  getDoc,
+  updateDoc,
+  collection,
+  getDocs,
+} from "firebase/firestore";
+let env;
+before(async () => {
+  env = await initializeTestEnvironment({
+    projectId: "demo-bcc",
+    firestore: { rules: await readFile("firestore.rules", "utf8") },
+  });
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    const db = ctx.firestore();
+    await setDoc(doc(db, "config/admin"), { uid: "owner" });
+    await setDoc(doc(db, "settings/global"), {
+      instructions: "Quality first",
+      workerEnabled: false,
+    });
+    await setDoc(doc(db, "projects/sikhi-khoj"), {
+      name: "Sikhi Khoj",
+      weight: 1,
+      enabled: true,
+      instructions: "",
+    });
+  });
+});
+after(async () => {
+  await env.cleanup();
+});
+const task = {
+  title: "Improve onboarding",
+  acceptance: "Works on a phone",
+  projectId: "sikhi-khoj",
+  priority: 1,
+  status: "queued",
+  approved: true,
+  createdAt: 1000,
+};
+test("anonymous and other signed-in accounts cannot read or write", async () => {
+  for (const ctx of [
+    env.unauthenticatedContext(),
+    env.authenticatedContext("stranger"),
+  ]) {
+    const db = ctx.firestore();
+    await assertFails(getDocs(collection(db, "tasks")));
+    await assertFails(setDoc(doc(db, "tasks/nope"), task));
+    await assertFails(getDoc(doc(db, "settings/global")));
+  }
+});
+test("admin can manage approved tasks but cannot promote own identity or forge reports", async () => {
+  const db = env.authenticatedContext("owner").firestore();
+  await assertSucceeds(setDoc(doc(db, "tasks/approved"), task));
+  await assertSucceeds(
+    updateDoc(doc(db, "tasks/approved"), { status: "review", updatedAt: 2000 }),
+  );
+  await assertFails(setDoc(doc(db, "config/admin"), { uid: "stranger" }));
+  await assertFails(setDoc(doc(db, "reports/fake"), { body: "fake" }));
+  await assertFails(setDoc(doc(db, "worker/status"), { status: "fake" }));
+});
+test("schema rejects arbitrary project, oversized data and injected fields", async () => {
+  const db = env.authenticatedContext("owner").firestore();
+  await assertFails(
+    setDoc(doc(db, "tasks/inject"), { ...task, command: "bad" }),
+  );
+  await assertFails(
+    setDoc(doc(db, "tasks/wrong-project"), { ...task, projectId: "other" }),
+  );
+  await assertFails(
+    setDoc(doc(db, "tasks/too-long"), { ...task, title: "a".repeat(181) }),
+  );
+  await assertFails(updateDoc(doc(db, "projects/sikhi-khoj"), { weight: -1 }));
+  await assertSucceeds(
+    updateDoc(doc(db, "projects/sikhi-khoj"), { weight: 3 }),
+  );
+});
