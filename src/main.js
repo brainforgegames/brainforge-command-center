@@ -81,7 +81,15 @@ function reports() {
   }</section>`;
 }
 function settings() {
-  return `<div class="two-col"><section class="panel"><h2>Worker connection</h2>${badge(state.worker.status)}<p>${state.worker.lastSeen ? "Last seen " + esc(new Date(state.worker.lastSeen).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })) + " IST" : "No local worker heartbeat received."}</p><p class="muted">${mode === "demo" ? "Demo controls do not start a worker." : "The local worker must also be configured and enabled on the laptop."}</p><button id="worker-toggle">${state.settings.workerEnabled ? "Pause scheduling" : "Allow scheduling"}</button><h3>Operating policy</h3><p>11 PM–midnight pause · skip blocked tasks · branches and PRs · user-controlled releases.</p></section><section class="panel"><h2>Usage & limits</h2><strong class="usage">${state.worker.quota == null ? "Unavailable" : esc(state.worker.quota) + "% used"}</strong><p>Account quota percentages require a supported quota source. Execution token counts are recorded separately in worker checkpoints.</p><div class="notice">No purchased credits. No API billing fallback.</div></section></div><section class="panel"><h2>Connection checklist</h2><ul><li>GitHub owner: brainforgegames</li><li>Firebase: ${mode === "demo" ? "pending setup" : "configured"}</li><li>Sikhi Khoj: Unity app and website repositories identified</li><li>Drivenix & Reflex Trainer: transfers pending</li><li>Worker activation: local setup required</li></ul></section>`;
+  return `<div class="two-col"><section class="panel"><h2>Worker connection</h2>${badge(state.worker.status)}<p>${state.worker.lastSeen ? "Last seen " + esc(new Date(state.worker.lastSeen).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })) + " IST" : "No local worker heartbeat received."}</p><p class="muted">${mode === "demo" ? "Demo controls do not start a worker." : "The local worker must also be configured and enabled on the laptop."}</p><button id="worker-toggle">${state.settings.workerEnabled ? "Pause scheduling" : "Allow scheduling"}</button><h3>Operating policy</h3><p>11 PM–midnight pause · skip blocked tasks · branches and PRs · user-controlled releases.</p></section><section class="panel"><h2>Usage & limits</h2><strong class="usage">${state.worker.quota == null ? "Unavailable" : esc(state.worker.quota) + "% used"}</strong><p>Account quota percentages require a supported quota source. Execution token counts are recorded separately in worker checkpoints.</p><div class="notice">No purchased credits. No API billing fallback.</div></section></div><section class="panel"><h2>Connection checklist</h2><ul><li>GitHub owner: brainforgegames</li><li>Firebase: ${mode === "demo" ? "pending setup" : "configured"}</li><li>Sikhi Khoj: Unity app and website repositories identified</li>${state.projects
+    .filter((p) => p.id !== "sikhi-khoj")
+    .map(
+      (p) =>
+        `<li>${esc(p.name)}: ${esc(p.connectionStatus || "Connection not verified")}</li>`,
+    )
+    .join(
+      "",
+    )}<li>Worker: ${esc(state.worker.status || "Awaiting heartbeat")}</li></ul></section>`;
 }
 function render() {
   const gated = mode === "firebase" && (!auth || auth.denied || auth.error);
@@ -98,6 +106,7 @@ function toast(message) {
 async function act(fn) {
   try {
     await fn();
+    render();
     toast("Saved successfully");
   } catch (e) {
     toast(e.message);
@@ -218,7 +227,7 @@ render();
 void boot(
   (s) => {
     state = s;
-    render();
+    if (!document.activeElement?.matches("input,textarea,select")) render();
   },
   (u) => {
     auth = u;

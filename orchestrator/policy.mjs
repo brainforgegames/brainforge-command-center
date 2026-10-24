@@ -35,6 +35,9 @@ export function makeReport(state, date, now = Date.now()) {
     createdAt: now,
     expiresAt: now + REPORT_TTL,
     body: [
+      state.settings?.dailyPlan?.date === date
+        ? state.settings.dailyPlan.body
+        : "",
       `Task status: ${
         Object.entries(counts)
           .map(([k, v]) => `${k}: ${v}`)

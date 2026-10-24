@@ -12,3 +12,5 @@ Not yet validated: a human Google sign-in on the published site, a real AI task/
 
 The existing disabled `Brainforge Development Pipeline` Windows task was not modified.
 
+
+2026-10-24 resumed validation: 12 unit tests pass, including remote identity and research scope checks. The standalone Windows worker successfully wrote an audit, passed the website smoke check and opened https://github.com/brainforgegames/sikhi-khoj-app/pull/1 as a draft. Drivenix and Reflexer mappings are verified; implementation checks remain pending. Tonight's dated improvement plan is saved for the report. Real quota reset and overnight pause observations remain pending.

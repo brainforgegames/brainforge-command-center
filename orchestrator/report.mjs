@@ -26,6 +26,7 @@ if (now.hour >= 22) {
     const state = {
       tasks: (await db.collection("tasks").get()).docs.map((d) => d.data()),
       worker: (await db.doc("worker/status").get()).data(),
+      settings: (await db.doc("settings/global").get()).data(),
     };
     try {
       await ref.create(makeReport(state, now.date));
