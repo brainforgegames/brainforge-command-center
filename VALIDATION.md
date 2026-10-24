@@ -8,7 +8,7 @@ Validated on Windows 11 Home, Intel i7-13620H (10 cores / 16 threads), 32 GB RAM
 - Firebase project, web app, Google provider, owner identity and admin UID mapping are provisioned. Rules deployed successfully; Firestore seeding is create-only and was verified. A paused worker connected to the live database. Billing API confirmed `billingEnabled: false` and no billing account attached.
 - The read-only Codex quota probe returned real short and weekly window values. These are account-wide snapshots, not per-task usage estimates.
 
-Not yet validated: a human Google sign-in on the published site, a real AI task/checkpoint/resume/PR lifecycle, actual quota exhaustion/reset over time, a 22:00 scheduled report, or a 23:00 interruption observed at wall-clock time. Those boundaries have deterministic policy tests, not a completed overnight production trial. Both Sikhi Khoj repositories are mapped, and two bounded tasks are queued for lifecycle validation. Drivenix/Reflex Trainer mappings are pending.
+Not yet validated: a human Google sign-in on the published site, a real interrupted task resumption, actual quota exhaustion/reset over time, a 22:00 scheduled report, or a 23:00 interruption observed at wall-clock time. Those boundaries have deterministic policy tests, not a completed overnight production trial. All project repositories are mapped. The website audit reached draft review; the Unity test setup still needs work.
 
 The existing disabled `Brainforge Development Pipeline` Windows task was not modified.
 
