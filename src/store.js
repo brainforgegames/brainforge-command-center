@@ -8,6 +8,15 @@ export const snapshot = () => structuredClone(data);
 export async function boot(onChange, onAuth) {
   callback = onChange;
   if (!configured) {
+    if (
+      import.meta.env.DEV &&
+      new URLSearchParams(location.search).get("sample") === "1"
+    ) {
+      data = (await import("./sample.js")).sampleState();
+      callback(snapshot());
+      onAuth({ demo: true });
+      return;
+    }
     try {
       data = JSON.parse(localStorage.getItem("bcc-demo-v1")) || initialState();
     } catch {

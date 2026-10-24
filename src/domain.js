@@ -28,7 +28,7 @@ export const PROJECTS = [
   },
 ];
 export const QUALITY =
-  "Prioritize quality and correctness over speed. Consider edge cases, accessibility, security, and the user experience. Run relevant checks, document evidence, use branches and PRs, and leave all releases to the user. If blocked, record the reason and continue another eligible task. Never purchase credits or use API-key billing.";
+  "Prioritize quality and correctness over speed. Consider edge cases, accessibility, security, and the user experience. Run relevant checks, document evidence, use branches and PRs, and handle review and merging. Only Play Store and App Store publishing remain with the user. Work on a user task or stated plan; otherwise research ideas and propose a plan before product changes. If blocked, record the reason and continue another eligible task. Ask the owner only for specific decisions, information or access. Never purchase credits or use API-key billing.";
 export const TARGETS = {
   "sikhi-khoj": [
     { id: "app", name: "Unity app", repository: "brainforgegames/Sikhi_Khoj" },

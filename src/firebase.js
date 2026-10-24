@@ -42,7 +42,7 @@ export async function connect(onChange, onAuth) {
     }
     onAuth(user);
     const state = initialState();
-    for (const name of ["projects", "tasks", "feedback", "reports"]) {
+    for (const name of ["projects", "tasks", "reports"]) {
       const ref =
         name === "reports"
           ? query(collection(db, name), where("expiresAt", ">", Date.now()))

@@ -1,4 +1,5 @@
 import { isPaused, istParts, selectTask } from "../src/domain.js";
+import { ownerView, studioSummary } from "../src/presentation.js";
 export { isPaused, istParts, selectTask };
 export function nextPause(now = new Date()) {
   const p = istParts(now);
@@ -34,6 +35,62 @@ export function makeReport(state, date, now = Date.now()) {
     title: "Daily studio report",
     createdAt: now,
     expiresAt: now + REPORT_TTL,
+    sections: (() => {
+      const s = studioSummary(state, now);
+      const projectPlans = (state.projects || [])
+        .filter((p) => p.nextPlan)
+        .map((p) => `${p.name}: ${p.nextPlan}`);
+      const label = (t) =>
+        `${{ "sikhi-khoj": "Sikhi Khoj", drivenix: "Drivenix", studio: "Brainforge studio", "reflex-trainer": "Reflex Trainer" }[t.projectId] || "Project"}: `;
+      return [
+        {
+          heading: "What was done",
+          items: s.completed
+            .map((t) => label(t) + ownerView(t).done)
+            .concat(
+              s.completed.length
+                ? []
+                : ["No completed result recorded today yet."],
+            ),
+        },
+        {
+          heading: "What got in the way",
+          items: s.issues
+            .map((t) => label(t) + ownerView(t).issue)
+            .concat(
+              s.issues.length ? [] : ["No unresolved task issues recorded."],
+            ),
+        },
+        {
+          heading: "What happens next",
+          items: [...s.active, ...s.planned]
+            .map((t) => label(t) + ownerView(t).next)
+            .concat(
+              s.active.length + s.planned.length
+                ? []
+                : [
+                    ...(projectPlans.length
+                      ? projectPlans
+                      : [
+                          "Finish pending reviews and investigate issues. When no agreed task remains, research ideas and propose a plan before changing the product.",
+                        ]),
+                  ],
+            ),
+        },
+        {
+          heading: "Your help",
+          items: s.questions
+            .map((t) => label(t) + ownerView(t).question)
+            .concat(
+              s.questions.length
+                ? []
+                : [
+                    "Nothing needed from you right now. Technical issues stay with me unless I ask a specific question.",
+                  ],
+            ),
+        },
+      ];
+    })(),
     body: [
       state.settings?.dailyPlan?.date === date
         ? state.settings.dailyPlan.body
@@ -68,7 +125,7 @@ export function makeReport(state, date, now = Date.now()) {
       state.worker?.nextAttemptAt
         ? `Next retry: ${new Date(state.worker.nextAttemptAt).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })} IST`
         : "No quota retry deadline recorded.",
-      `Releases remain user-controlled. No purchased credits or API billing fallback.`,
+      `Checks, reviews and merging are handled by the worker. Only Play Store and App Store publishing remain user-controlled. No purchased credits or API billing fallback.`,
     ].join("\n"),
   };
 }

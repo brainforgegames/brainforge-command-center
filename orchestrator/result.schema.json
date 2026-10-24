@@ -2,8 +2,30 @@
   "type": "object",
   "properties": {
     "status": { "type": "string", "enum": ["review", "blocked"] },
-    "summary": { "type": "string" }
+    "summary": { "type": "string" },
+    "ownerUpdate": {
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "done": { "type": "string" },
+        "issue": { "type": "string" },
+        "next": { "type": "string" },
+        "needsOwner": { "type": "boolean" },
+        "question": { "type": "string" },
+        "answerHint": { "type": "string" }
+      },
+      "required": [
+        "title",
+        "done",
+        "issue",
+        "next",
+        "needsOwner",
+        "question",
+        "answerHint"
+      ],
+      "additionalProperties": false
+    }
   },
-  "required": ["status", "summary"],
+  "required": ["status", "summary", "ownerUpdate"],
   "additionalProperties": false
 }

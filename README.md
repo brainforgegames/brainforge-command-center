@@ -4,7 +4,7 @@ A responsive, single-admin workspace for Sikhi Khoj, Drivenix and Reflex Trainer
 
 ## Stage 1: dashboard and Firebase
 
-The interface includes project time weights, approved tasks with acceptance criteria and status, feedback with conversation links, global/project instructions, daily reports, worker state, and quota windows. Without Firebase environment variables, it runs an explicitly labelled browser-local demo. A configured build requires the admin Google account; it does not fall back to demo on an authentication failure.
+The dark interface centers on Today, project cards, a filterable work board, specific owner questions, readable daily reports and work controls. Progress, issues and next steps use short owner-facing summaries; internal acceptance criteria, diagnostics and checks are collapsed. Feedback and instructions come through chat. Internal scheduling weights and stored instructions remain available to the worker. Without Firebase environment variables, it runs an explicitly labelled browser-local demo. A configured build requires the admin Google account; it does not fall back to demo on an authentication failure.
 
 Firebase project: `brainforge-bcc-2026`. Google sign-in is enabled. Owner: `brainforgegames@gmail.com`, Auth UID `brainforge-admin`. Firestore region: `asia-south1`. Billing is disabled and no billing account is attached. The web configuration is public configuration, not an authorization mechanism; Firestore rules enforce access against the server-managed `config/admin` document. Browser clients cannot change that document or forge reports/worker telemetry.
 
