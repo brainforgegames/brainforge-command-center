@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.env*
+!.env.example
+.local/
+*-debug.log
+worker.config.json
+firebase.config.json
+firestore.production.rules
+*.credential.json
