@@ -2,9 +2,19 @@ import { spawnSync } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
-export function researchPath(date) {
+export function researchPath(date, scope = "") {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw Error("Invalid research date.");
-  return `bcc-research/${date}.md`;
+  if (scope && !/^[a-z][a-z0-9-]{0,60}$/.test(scope))
+    throw Error("Invalid research scope.");
+  return `bcc-research/${scope ? scope + "/" : ""}${date}.md`;
+}
+export const publishReview = (task, project, enabled) =>
+  !!enabled && !(task.kind === "research" && project.privateResearch);
+export function validateProjectTask(task, project) {
+  if (project.researchOnly && task.kind !== "research")
+    throw Error(
+      "This project is for private strategy research. Product changes need a separate project task.",
+    );
 }
 export function validateResearch(paths, body, allowed) {
   if (!paths.length || paths.some((p) => p !== allowed))
@@ -30,7 +40,7 @@ if (
   process.argv[1] &&
   path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)
 ) {
-  const allowed = researchPath(process.argv[2]);
+  const allowed = researchPath(process.argv[2], process.argv[3] || "");
   const run = (args) => {
     const r = spawnSync("git", args, { encoding: "utf8", windowsHide: true });
     if (r.status !== 0) throw Error("Unable to inspect research changes.");

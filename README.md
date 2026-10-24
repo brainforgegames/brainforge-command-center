@@ -1,10 +1,10 @@
 # Brainforge Command Center
 
-A responsive, single-admin workspace for Sikhi Khoj, Drivenix and Reflex Trainer. The public GitHub Pages frontend keeps workspace records in Firebase Auth/Firestore. Public code is separate from private workspace data.
+A responsive, single-admin workspace for Sikhi Khoj, Drivenix, Reflex Trainer, Brainforge Games company improvements and BCC Improvements. The public GitHub Pages frontend keeps workspace records in Firebase Auth/Firestore. Public code is separate from private workspace data.
 
 ## Stage 1: dashboard and Firebase
 
-The dark interface centers on Today, project cards, a filterable work board, specific owner questions, readable daily reports and work controls. Progress, issues and next steps use short owner-facing summaries; internal acceptance criteria, diagnostics and checks are collapsed. Feedback and instructions come through chat. Internal scheduling weights and stored instructions remain available to the worker. Without Firebase environment variables, it runs an explicitly labelled browser-local demo. A configured build requires the admin Google account; it does not fall back to demo on an authentication failure.
+The dark interface centers on Today, project cards, a dedicated Time split screen, a filterable work board, specific owner questions, readable daily reports and work controls. Progress, issues and next steps use short owner-facing summaries; internal acceptance criteria, diagnostics and checks are collapsed. Feedback and instructions come through chat. Internal scheduling weights and stored instructions remain available to the worker. Without Firebase environment variables, it runs an explicitly labelled browser-local demo. A configured build requires the admin Google account; it does not fall back to demo on an authentication failure.
 
 Firebase project: `brainforge-bcc-2026`. Google sign-in is enabled. Owner: `brainforgegames@gmail.com`, Auth UID `brainforge-admin`. Firestore region: `asia-south1`. Billing is disabled and no billing account is attached. The web configuration is public configuration, not an authorization mechanism; Firestore rules enforce access against the server-managed `config/admin` document. Browser clients cannot change that document or forge reports/worker telemetry.
 
@@ -63,3 +63,9 @@ Sikhi Khoj includes both `Sikhi_Khoj` (Unity app) and `sikhi-khoj-app` (website)
 References: [Codex non-interactive mode](https://learn.chatgpt.com/docs/non-interactive-mode), [App Server quota protocol](https://learn.chatgpt.com/docs/app-server), [Firestore security rules](https://firebase.google.com/docs/firestore/security/get-started), [GitHub Pages workflows](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages).
 
 
+
+## Time split and studio work
+
+Time split lives in its own navigation item (inside the burger menu on phones). Five sliders and numeric inputs choose integer percentages totaling 100. Saving uses one Firestore batch, so a rejected update cannot partially change the split. A 0% project is disabled for new selection. Project cards display saved shares; drafts do not change the worker. Existing equal weights translate to 20% each without resetting stored choices. The optional suggested preset is 30/25/25/10/10 for Sikhi Khoj, Drivenix, Reflex Trainer, company and BCC; it does not apply until saved.
+
+Weights describe a long-term share of elapsed eligible work time, not reserved clock hours. Blocked or empty projects yield to eligible work. The company and BCC research tasks use distinct document paths and private local worktrees; proposals are saved in authenticated Firestore and are never pushed as public research PRs. The company mapping is research-only. BCC implementation tasks retain normal code checks and review publication.

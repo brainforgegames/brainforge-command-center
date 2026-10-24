@@ -14,6 +14,7 @@ import {
   setDoc,
   query,
   where,
+  writeBatch,
 } from "firebase/firestore";
 import { initialState } from "./domain.js";
 export async function connect(onChange, onAuth) {
@@ -82,6 +83,13 @@ export async function connect(onChange, onAuth) {
   return {
     login: () => signInWithPopup(auth, new GoogleAuthProvider()),
     logout: () => signOut(auth),
+    saveAllocations: async (rows) => {
+      const batch = writeBatch(db);
+      rows.forEach(({ id, weight, enabled }) =>
+        batch.update(doc(db, "projects", id), { weight, enabled }),
+      );
+      await batch.commit();
+    },
     save: (name, id, value) =>
       setDoc(doc(db, name, name === "settings" ? "global" : id), value, {
         merge: true,

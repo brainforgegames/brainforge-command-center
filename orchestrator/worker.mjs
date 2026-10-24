@@ -26,7 +26,11 @@ import {
   gitlabReviewPush,
 } from "./repositories.mjs";
 import { istParts } from "../src/domain.js";
-import { researchPath } from "./research.mjs";
+import {
+  researchPath,
+  publishReview,
+  validateProjectTask,
+} from "./research.mjs";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."),
   local = path.join(root, ".local");
 await mkdir(local, { recursive: true });
@@ -329,14 +333,18 @@ async function tick() {
           cfg.projects[p.id]?.repositories?.app || cfg.projects[p.id];
         if (!mapping?.path || !mapping.repository) continue;
         const id = `research-${p.id}-${date}`;
+        const scope = ["brainforge-company", "bcc-improvements"].includes(p.id)
+          ? p.id
+          : "";
         try {
           await db.doc("tasks/" + id).create({
             projectId: p.id,
             target: "app",
             kind: "research",
             researchDate: date,
+            researchScope: scope,
             title: `Research improvements for ${p.name} — ${date}`,
-            acceptance: `Write only ${researchPath(date)}. Include headings Evidence, Improvements, Checks, Blockers. Inspect actual source and compare relevant products using primary official sources when accessible. Rank improvements by user benefit, effort, risk and acceptance checks. Distinguish verified facts from hypotheses and unavailable evidence. Include at least 200 words. Do not modify app code, copy credentials/personal data, purchase services, merge, deploy or release. If external research is unavailable, disclose it and use repository evidence; never invent comparisons.`,
+            acceptance: `Write only ${researchPath(date, scope)}. Focus on ${p.name}: ${p.description || ""}. Include headings Evidence, Improvements, Checks, Blockers. Inspect available source and compare relevant products or companies using primary official sources when accessible. Rank improvements by user benefit, effort, risk and acceptance checks. Distinguish verified facts from hypotheses and unavailable evidence. Include at least 200 words. Do not modify app code, copy credentials/personal data, purchase services, merge, deploy or release. If external research is unavailable, disclose it and use repository evidence; never invent comparisons.`,
             priority: 1,
             status: "queued",
             approved: true,
@@ -374,6 +382,7 @@ async function tick() {
   let work, branch;
   try {
     if (!project?.path) throw Error("Local repository mapping is pending.");
+    validateProjectTask(task, project);
     ({ work, branch } = await prepare(task, project));
   } catch (e) {
     await db.doc("tasks/" + task.id).update({
@@ -558,6 +567,7 @@ async function tick() {
             process.execPath,
             path.join(root, "orchestrator/research.mjs"),
             task.researchDate,
+            task.researchScope || "",
           ],
         ]
       : project.checks;
@@ -604,7 +614,7 @@ async function tick() {
     }
   }
   let pr = null;
-  if (cfg.publishPullRequests) {
+  if (publishReview(task, project, cfg.publishPullRequests)) {
     if (isPaused(new Date())) return;
     await checked("git", ["add", "--all"], work);
     const diff = await command("git", ["diff", "--cached", "--quiet"], work);
@@ -687,6 +697,17 @@ async function tick() {
     status: "review",
     result: result.summary,
     ownerUpdate: result.ownerUpdate,
+    ...(task.kind === "research" && project.privateResearch
+      ? {
+          researchBody: await readFile(
+            path.join(
+              work,
+              researchPath(task.researchDate, task.researchScope || ""),
+            ),
+            "utf8",
+          ),
+        }
+      : {}),
     evidence,
     branch,
     pr,
