@@ -26,6 +26,26 @@ export const PROJECTS = [
     enabled: true,
     instructions: "",
   },
+  {
+    id: "brainforge-company",
+    name: "Brainforge Games",
+    short: "BG",
+    description: "Company improvements · strategy, growth & operations",
+    weight: 1,
+    enabled: true,
+    instructions:
+      "Research and propose improvements to the Brainforge Games company. No spending, external outreach or product changes without a task or stated plan.",
+  },
+  {
+    id: "bcc-improvements",
+    name: "BCC Improvements",
+    short: "BC",
+    description: "A clearer, smarter command center",
+    weight: 1,
+    enabled: true,
+    instructions:
+      "Improve the dashboard, reporting and worker reliability through agreed tasks or stated plans. Research and propose ideas when no implementation task remains.",
+  },
 ];
 export const QUALITY =
   "Prioritize quality and correctness over speed. Consider edge cases, accessibility, security, and the user experience. Run relevant checks, document evidence, use branches and PRs, and handle review and merging. Only Play Store and App Store publishing remain with the user. Work on a user task or stated plan; otherwise research ideas and propose a plan before product changes. If blocked, record the reason and continue another eligible task. Ask the owner only for specific decisions, information or access. Never purchase credits or use API-key billing.";
@@ -40,6 +60,8 @@ export const TARGETS = {
   ],
   drivenix: [{ id: "app", name: "App" }],
   "reflex-trainer": [{ id: "app", name: "App" }],
+  "brainforge-company": [{ id: "app", name: "Company strategy" }],
+  "bcc-improvements": [{ id: "app", name: "Dashboard" }],
 };
 export const targetName = (task) =>
   TARGETS[task.projectId]?.find((t) => t.id === (task.target || "app"))?.name ||

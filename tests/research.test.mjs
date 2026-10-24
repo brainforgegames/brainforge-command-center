@@ -1,6 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { researchPath, validateResearch } from "../orchestrator/research.mjs";
+import {
+  researchPath,
+  validateResearch,
+  publishReview,
+  validateProjectTask,
+} from "../orchestrator/research.mjs";
 test("idle research cannot smuggle code changes or credentials into an approved planning task", () => {
   const p = researchPath("2026-10-24"),
     body =
@@ -14,4 +19,26 @@ test("idle research cannot smuggle code changes or credentials into an approved 
     /credential/,
   );
   assert.throws(() => researchPath("../../secret"));
+});
+test("company and dashboard strategy stay private with distinct research paths", () => {
+  assert.notEqual(
+    researchPath("2026-10-24", "brainforge-company"),
+    researchPath("2026-10-24", "bcc-improvements"),
+  );
+  assert.throws(() => researchPath("2026-10-24", "../escape"));
+  assert.equal(
+    publishReview({ kind: "research" }, { privateResearch: true }, true),
+    false,
+  );
+  assert.equal(
+    publishReview({ kind: "implementation" }, { privateResearch: true }, true),
+    true,
+  );
+  assert.equal(publishReview({ kind: "implementation" }, {}, false), false);
+  assert.throws(() =>
+    validateProjectTask({ kind: "implementation" }, { researchOnly: true }),
+  );
+  assert.doesNotThrow(() =>
+    validateProjectTask({ kind: "research" }, { researchOnly: true }),
+  );
 });

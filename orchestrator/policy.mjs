@@ -41,7 +41,7 @@ export function makeReport(state, date, now = Date.now()) {
         .filter((p) => p.nextPlan)
         .map((p) => `${p.name}: ${p.nextPlan}`);
       const label = (t) =>
-        `${{ "sikhi-khoj": "Sikhi Khoj", drivenix: "Drivenix", studio: "Brainforge studio", "reflex-trainer": "Reflex Trainer" }[t.projectId] || "Project"}: `;
+        `${{ "sikhi-khoj": "Sikhi Khoj", drivenix: "Drivenix", studio: "Brainforge studio", "brainforge-company": "Brainforge Games", "bcc-improvements": "BCC Improvements", "reflex-trainer": "Reflex Trainer" }[t.projectId] || "Project"}: `;
       return [
         {
           heading: "What was done",

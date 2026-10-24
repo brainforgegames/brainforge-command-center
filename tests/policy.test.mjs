@@ -86,7 +86,7 @@ test("reports at 22 IST once per date with catch-up", () => {
   );
 });
 test("weights allocate time and skip blocked, unapproved and disabled tasks", () => {
-  const p = initialState().projects;
+  const p = initialState().projects.slice(0, 3);
   p[0].weight = 3;
   const t = p.map((p, i) => ({
     id: String(i),
@@ -117,11 +117,13 @@ test("weighted selection converges without starving projects", () => {
     createdAt: 0,
   }));
   const served = {};
-  for (let i = 0; i < 500; i++) {
+  for (let i = 0; i < 700; i++) {
     const task = selectTask(p, tasks, served);
     served[task.projectId] = (served[task.projectId] || 0) + 1;
   }
   assert.deepEqual(served, {
+    "bcc-improvements": 100,
+    "brainforge-company": 100,
     drivenix: 100,
     "reflex-trainer": 100,
     "sikhi-khoj": 300,
@@ -165,5 +167,5 @@ test("only reports expire at 30 days", () => {
   assert.equal(reportVisible(report, report.expiresAt - 1), true);
   assert.equal(reportVisible(report, report.expiresAt), false);
   assert.match(report.body, /Needs login: Permission/);
-  assert.equal(s.projects.length, 3);
+  assert.equal(s.projects.length, 5);
 });

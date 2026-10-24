@@ -12,6 +12,7 @@ import {
   updateDoc,
   collection,
   getDocs,
+  writeBatch,
 } from "firebase/firestore";
 let env;
 before(async () => {
@@ -91,5 +92,47 @@ test("schema rejects arbitrary project, oversized data and injected fields", asy
       projectId: "drivenix",
       target: "website",
     }),
+  );
+});
+test("owner time split writes are atomic and new project tasks are supported", async () => {
+  const db = env.authenticatedContext("owner").firestore();
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), "projects/bcc-improvements"), {
+      name: "BCC Improvements",
+      weight: 1,
+      enabled: true,
+      instructions: "",
+    });
+  });
+  const batch = writeBatch(db);
+  batch.update(doc(db, "projects/sikhi-khoj"), { weight: 60, enabled: true });
+  batch.update(doc(db, "projects/bcc-improvements"), {
+    weight: 40,
+    enabled: true,
+  });
+  await assertSucceeds(batch.commit());
+  const bad = writeBatch(db);
+  bad.update(doc(db, "projects/sikhi-khoj"), { weight: 50 });
+  bad.update(doc(db, "projects/bcc-improvements"), { weight: 101 });
+  await assertFails(bad.commit());
+  if ((await getDoc(doc(db, "projects/sikhi-khoj"))).data().weight !== 60)
+    throw Error("Rejected allocation partially applied");
+  await assertSucceeds(
+    setDoc(doc(db, "tasks/company"), {
+      ...task,
+      projectId: "brainforge-company",
+    }),
+  );
+  await assertSucceeds(
+    setDoc(doc(db, "tasks/bcc"), { ...task, projectId: "bcc-improvements" }),
+  );
+  await assertFails(
+    updateDoc(
+      doc(
+        env.authenticatedContext("stranger").firestore(),
+        "projects/bcc-improvements",
+      ),
+      { weight: 0 },
+    ),
   );
 });

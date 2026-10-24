@@ -33,6 +33,44 @@
       "repository": "",
       "baseBranch": "main",
       "checks": []
+    },
+    "brainforge-company": {
+      "provider": "github",
+      "path": "",
+      "repository": "brainforgegames/brainforge-command-center",
+      "baseBranch": "main",
+      "privateResearch": true,
+      "researchOnly": true,
+      "checks": [
+        [
+          "npm",
+          "test"
+        ],
+        [
+          "npm",
+          "run",
+          "build"
+        ]
+      ]
+    },
+    "bcc-improvements": {
+      "provider": "github",
+      "path": "",
+      "repository": "brainforgegames/brainforge-command-center",
+      "baseBranch": "main",
+      "privateResearch": true,
+      "researchOnly": false,
+      "checks": [
+        [
+          "npm",
+          "test"
+        ],
+        [
+          "npm",
+          "run",
+          "build"
+        ]
+      ]
     }
   }
 }

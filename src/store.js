@@ -1,4 +1,5 @@
 import { initialState, reportVisible } from "./domain.js";
+import { validateAllocation } from "./allocation.js";
 const configured = !!import.meta.env.VITE_FIREBASE_PROJECT_ID;
 export const mode = configured ? "firebase" : "demo";
 let data = initialState(),
@@ -23,6 +24,10 @@ export async function boot(onChange, onAuth) {
       data = initialState();
     }
     data.reports = data.reports.filter((r) => reportVisible(r));
+    data.projects = initialState().projects.map((p) => ({
+      ...p,
+      ...data.projects.find((old) => old.id === p.id),
+    }));
     callback(snapshot());
     onAuth({ demo: true });
     return;
@@ -46,4 +51,14 @@ export async function save(collection, id, value) {
   callback(snapshot());
 }
 export const login = () => remote?.login();
+export async function saveAllocations(values) {
+  const rows = validateAllocation(data.projects, values);
+  if (remote) return remote.saveAllocations(rows);
+  data.projects = data.projects.map((p) => ({
+    ...p,
+    ...rows.find((r) => r.id === p.id),
+  }));
+  localStorage.setItem("bcc-demo-v1", JSON.stringify(data));
+  callback(snapshot());
+}
 export const logout = () => remote?.logout();
