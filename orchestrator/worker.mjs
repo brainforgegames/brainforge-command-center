@@ -296,7 +296,7 @@ async function tick() {
     return;
   }
   let task = cp.task ? s.tasks.find((t) => t.id === cp.task.id) : null;
-  if (task && task.status !== "running") {
+  if (cp.task && (!task || task.status !== "running")) {
     cp.task = null;
     await checkpoint();
     task = null;

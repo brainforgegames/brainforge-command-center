@@ -41,6 +41,7 @@ export function makeReport(state, date, now = Date.now()) {
           .join(", ") || "No tasks yet."
       }`,
       `Worker: ${state.worker?.status || "starting"}`,
+      `Changed in the last 24 hours: ${state.tasks.filter((t) => (t.updatedAt || t.createdAt || 0) >= now - 86400000).length} tasks`,
       `Blocked tasks:`,
       ...state.tasks
         .filter((t) => t.status === "blocked")
@@ -48,7 +49,9 @@ export function makeReport(state, date, now = Date.now()) {
       `Ready for review:`,
       ...state.tasks
         .filter((t) => t.status === "review")
-        .map((t) => `• ${t.title}: ${t.result || "See task evidence"}`),
+        .map((t) => [`• ${t.title}: ${t.result || "See task evidence"}`, t.branch ? `  Branch: ${t.branch}` : '', t.pr ? `  PR: ${t.pr}` : '', ...(t.evidence || []).map((e) => `  ${e.passed ? 'PASS' : 'FAIL'}: ${e.command}`)].filter(Boolean).join('\n')),
+      `Quota: ${state.worker?.quota == null ? 'unavailable' : state.worker.quota + '% used (most used reported window)'}`,
+      state.worker?.nextAttemptAt ? `Next retry: ${new Date(state.worker.nextAttemptAt).toLocaleString('en-IN', {timeZone:'Asia/Kolkata'})} IST` : 'No quota retry deadline recorded.',
       `Releases remain user-controlled. No purchased credits or API billing fallback.`,
     ].join("\n"),
   };
