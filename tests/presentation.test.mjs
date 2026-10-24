@@ -15,6 +15,8 @@ test("ordinary technical failures and reviews never become owner questions", () 
     { status: "review", result: "Draft created" },
   ];
   assert.equal(studioSummary(s).questions.length, 0);
+  assert.equal(studioSummary(s).open.length, 2);
+  assert.equal(studioSummary(s).checking.length, 1);
   assert.doesNotMatch(ownerView(s.tasks[0]).issue, /Filename/);
   s.tasks.push({
     status: "blocked",
