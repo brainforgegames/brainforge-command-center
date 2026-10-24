@@ -81,6 +81,8 @@ export function studioSummary(state, now = Date.now(), includeStudio = true) {
         istParts(new Date(stamp(t))).date === istParts(new Date(now)).date,
     );
   return {
+    open: state.tasks.filter((t) => t.status !== "done"),
+    checking: tasks.filter((t) => t.status === "review"),
     today,
     completed: today.filter((t) => ["review", "done"].includes(t.status)),
     issues: tasks.filter((t) => t.status === "blocked"),
