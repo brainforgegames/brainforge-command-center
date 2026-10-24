@@ -29,9 +29,9 @@ The Codex executable must be on PATH or configured with its absolute path. Codex
 ```powershell
 npm run worker:plan
 npm run worker:once
-powershell -File scripts/install-worker.ps1
+node scripts/install-worker.mjs
 # Remove the two BCC scheduled tasks:
-powershell -File scripts/install-worker.ps1 -Uninstall
+node scripts/install-worker.mjs --uninstall
 ```
 
 The installer creates separate current-user scheduled tasks for development and reporting, checked every minute. Development has an exclusive local lock. Reports do not wait for an active AI run or a quota reset. Windows must be awake and the user signed in. This does not shut down the laptop, wake a powered-off machine, or run before login.
@@ -61,3 +61,4 @@ CI runs policy tests, Firestore rules tests against a disposable emulator, and t
 Pending before development activation: confirm whether Sikhi Khoj needs `Sikhi_Khoj`, `sikhi-khoj-app`, or both; identify and transfer the exact Drivenix/Reflex Trainer source repositories; map local clones and checks; validate one real task through interruption, resumption and PR review. An older Brainforge pipeline scheduler was found **disabled** and remains untouched. Do not enable both schedulers for the same work.
 
 References: [Codex non-interactive mode](https://learn.chatgpt.com/docs/non-interactive-mode), [App Server quota protocol](https://learn.chatgpt.com/docs/app-server), [Firestore security rules](https://firebase.google.com/docs/firestore/security/get-started), [GitHub Pages workflows](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages).
+
