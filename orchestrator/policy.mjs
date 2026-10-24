@@ -49,9 +49,22 @@ export function makeReport(state, date, now = Date.now()) {
       `Ready for review:`,
       ...state.tasks
         .filter((t) => t.status === "review")
-        .map((t) => [`• ${t.title}: ${t.result || "See task evidence"}`, t.branch ? `  Branch: ${t.branch}` : '', t.pr ? `  PR: ${t.pr}` : '', ...(t.evidence || []).map((e) => `  ${e.passed ? 'PASS' : 'FAIL'}: ${e.command}`)].filter(Boolean).join('\n')),
-      `Quota: ${state.worker?.quota == null ? 'unavailable' : state.worker.quota + '% used (most used reported window)'}`,
-      state.worker?.nextAttemptAt ? `Next retry: ${new Date(state.worker.nextAttemptAt).toLocaleString('en-IN', {timeZone:'Asia/Kolkata'})} IST` : 'No quota retry deadline recorded.',
+        .map((t) =>
+          [
+            `• ${t.title}: ${t.result || "See task evidence"}`,
+            t.branch ? `  Branch: ${t.branch}` : "",
+            t.pr ? `  PR: ${t.pr}` : "",
+            ...(t.evidence || []).map(
+              (e) => `  ${e.passed ? "PASS" : "FAIL"}: ${e.command}`,
+            ),
+          ]
+            .filter(Boolean)
+            .join("\n"),
+        ),
+      `Quota: ${state.worker?.quota == null ? "unavailable" : state.worker.quota + "% used (most used reported window)"}`,
+      state.worker?.nextAttemptAt
+        ? `Next retry: ${new Date(state.worker.nextAttemptAt).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })} IST`
+        : "No quota retry deadline recorded.",
       `Releases remain user-controlled. No purchased credits or API billing fallback.`,
     ].join("\n"),
   };

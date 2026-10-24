@@ -77,18 +77,16 @@ async function readState() {
 }
 let quota = null;
 async function status(value) {
-  await db
-    .doc("worker/status")
-    .set(
-      {
-        status: value,
-        lastSeen: Date.now(),
-        quota: quota?.usedPercent ?? null,
-        quotaWindows: quota?.windows || [],
-        nextAttemptAt: cp.nextAttemptAt || null,
-      },
-      { merge: true },
-    );
+  await db.doc("worker/status").set(
+    {
+      status: value,
+      lastSeen: Date.now(),
+      quota: quota?.usedPercent ?? null,
+      quotaWindows: quota?.windows || [],
+      nextAttemptAt: cp.nextAttemptAt || null,
+    },
+    { merge: true },
+  );
 }
 function command(
   exe,
@@ -306,7 +304,10 @@ async function tick() {
     await status("Idle · no approved eligible tasks");
     return;
   }
-  const project = cfg.projects[task.projectId];
+  const projectGroup = cfg.projects[task.projectId];
+  const project =
+    projectGroup?.repositories?.[task.target || "app"] ||
+    ((task.target || "app") === "app" ? projectGroup : null);
   if (dry) {
     console.log(
       JSON.stringify({
@@ -322,13 +323,11 @@ async function tick() {
     if (!project?.path) throw Error("Local repository mapping is pending.");
     ({ work, branch } = await prepare(task, project));
   } catch (e) {
-    await db
-      .doc("tasks/" + task.id)
-      .update({
-        status: "blocked",
-        blockedReason: e.message,
-        updatedAt: Date.now(),
-      });
+    await db.doc("tasks/" + task.id).update({
+      status: "blocked",
+      blockedReason: e.message,
+      updatedAt: Date.now(),
+    });
     await status("Skipped blocked task");
     return;
   }
@@ -419,6 +418,9 @@ async function tick() {
   }
   cp.served[task.projectId] =
     (cp.served[task.projectId] || 0) + (Date.now() - started) / 60000;
+  const targetKey = `${task.projectId}:${task.target || "app"}`;
+  cp.served[targetKey] =
+    (cp.served[targetKey] || 0) + (Date.now() - started) / 60000;
   await writeFile(
     path.join(local, `run-${runId}.jsonl`),
     events.map((e) => JSON.stringify(e)).join("\n"),
@@ -438,13 +440,11 @@ async function tick() {
       await status("Checkpointed · waiting for plan limit reset");
       return;
     }
-    await db
-      .doc("tasks/" + task.id)
-      .update({
-        status: "blocked",
-        blockedReason: `Worker ${kind}; inspect local run log and resolve before requeuing.`,
-        updatedAt: Date.now(),
-      });
+    await db.doc("tasks/" + task.id).update({
+      status: "blocked",
+      blockedReason: `Worker ${kind}; inspect local run log and resolve before requeuing.`,
+      updatedAt: Date.now(),
+    });
     cp.task = null;
     await checkpoint();
     return;
@@ -458,25 +458,21 @@ async function tick() {
     )
       throw Error("Invalid structured result");
   } catch {
-    await db
-      .doc("tasks/" + task.id)
-      .update({
-        status: "blocked",
-        blockedReason:
-          "Worker result could not be validated. Inspect checkpoint before requeuing.",
-      });
+    await db.doc("tasks/" + task.id).update({
+      status: "blocked",
+      blockedReason:
+        "Worker result could not be validated. Inspect checkpoint before requeuing.",
+    });
     cp.task = null;
     await checkpoint();
     return;
   }
   if (result.status === "blocked") {
-    await db
-      .doc("tasks/" + task.id)
-      .update({
-        status: "blocked",
-        blockedReason: result.summary,
-        updatedAt: Date.now(),
-      });
+    await db.doc("tasks/" + task.id).update({
+      status: "blocked",
+      blockedReason: result.summary,
+      updatedAt: Date.now(),
+    });
     cp.task = null;
     await checkpoint();
     return;
@@ -504,14 +500,12 @@ async function tick() {
     });
     evidence.push({ command: check.join(" "), passed: c.code === 0 });
     if (c.code !== 0) {
-      await db
-        .doc("tasks/" + task.id)
-        .update({
-          status: "blocked",
-          blockedReason: "Quality check failed: " + check.join(" "),
-          evidence,
-          updatedAt: Date.now(),
-        });
+      await db.doc("tasks/" + task.id).update({
+        status: "blocked",
+        blockedReason: "Quality check failed: " + check.join(" "),
+        evidence,
+        updatedAt: Date.now(),
+      });
       cp.task = null;
       await checkpoint();
       return;
@@ -570,16 +564,14 @@ async function tick() {
       );
     }
   }
-  await db
-    .doc("tasks/" + task.id)
-    .update({
-      status: "review",
-      result: result.summary,
-      evidence,
-      branch,
-      pr,
-      updatedAt: Date.now(),
-    });
+  await db.doc("tasks/" + task.id).update({
+    status: "review",
+    result: result.summary,
+    evidence,
+    branch,
+    pr,
+    updatedAt: Date.now(),
+  });
   cp.task = null;
   cp.nextAttemptAt = 0;
   await checkpoint();

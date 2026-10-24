@@ -82,4 +82,14 @@ test("schema rejects arbitrary project, oversized data and injected fields", asy
   await assertSucceeds(
     updateDoc(doc(db, "projects/sikhi-khoj"), { weight: 3 }),
   );
+  await assertSucceeds(
+    setDoc(doc(db, "tasks/website"), { ...task, target: "website" }),
+  );
+  await assertFails(
+    setDoc(doc(db, "tasks/invalid-target"), {
+      ...task,
+      projectId: "drivenix",
+      target: "website",
+    }),
+  );
 });

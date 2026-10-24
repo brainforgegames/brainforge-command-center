@@ -17,6 +17,39 @@ import {
   REPORT_TTL,
 } from "../orchestrator/policy.mjs";
 import { summarizeQuota } from "../orchestrator/quota.mjs";
+test("Sikhi Khoj app and website share project allocation without starving either target", () => {
+  const p = initialState().projects;
+  const tasks = [
+    {
+      id: "app",
+      projectId: "sikhi-khoj",
+      target: "app",
+      status: "queued",
+      approved: true,
+      priority: 1,
+      createdAt: 1,
+    },
+    {
+      id: "website",
+      projectId: "sikhi-khoj",
+      target: "website",
+      status: "queued",
+      approved: true,
+      priority: 1,
+      createdAt: 2,
+    },
+  ];
+  assert.equal(selectTask(p, tasks, { "sikhi-khoj:app": 25 }).id, "website");
+  assert.equal(selectTask(p, tasks, { "sikhi-khoj:website": 25 }).id, "app");
+  assert.throws(() =>
+    validateTask({
+      title: "x",
+      acceptance: "works",
+      projectId: "drivenix",
+      target: "website",
+    }),
+  );
+});
 test("quota waits for the latest exhausted window and treats missing as unknown", () => {
   const q = summarizeQuota(
     {

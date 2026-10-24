@@ -7,10 +7,20 @@
   "publishPullRequests": false,
   "projects": {
     "sikhi-khoj": {
-      "path": "",
-      "repository": "brainforgegames/Sikhi_Khoj",
-      "baseBranch": "main",
-      "checks": []
+      "repositories": {
+        "app": {
+          "path": "",
+          "repository": "brainforgegames/Sikhi_Khoj",
+          "baseBranch": "main",
+          "checks": []
+        },
+        "website": {
+          "path": "",
+          "repository": "brainforgegames/sikhi-khoj-app",
+          "baseBranch": "main",
+          "checks": []
+        }
+      }
     },
     "drivenix": {
       "path": "",

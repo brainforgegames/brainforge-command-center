@@ -6,6 +6,8 @@ import {
   STATUSES,
   istParts,
   reportVisible,
+  TARGETS,
+  targetName,
 } from "./domain.js";
 let state = initialState(),
   page = "Overview",
@@ -33,7 +35,7 @@ function taskRows(tasks) {
     ? tasks
         .map(
           (t) =>
-            `<article class="task"><div><small>${esc(name(t.projectId))} · Priority ${t.priority}</small><h3>${esc(t.title)}</h3><p>${esc(t.acceptance)}</p>${t.blockedReason ? `<p class="warning">${esc(t.blockedReason)}</p>` : ""}</div><label><span class="sr">Task status</span><select data-status="${esc(t.id)}" ${t.status === "running" ? "disabled" : ""}>${STATUSES.filter(
+            `<article class="task"><div><small>${esc(name(t.projectId))} · ${esc(targetName(t))} · Priority ${t.priority}</small><h3>${esc(t.title)}</h3><p>${esc(t.acceptance)}</p>${t.blockedReason ? `<p class="warning">${esc(t.blockedReason)}</p>` : ""}</div><label><span class="sr">Task status</span><select data-status="${esc(t.id)}" ${t.status === "running" ? "disabled" : ""}>${STATUSES.filter(
               (s) => s !== "running" || t.status === "running",
             )
               .map(
@@ -56,7 +58,7 @@ function overview() {
   return `<div class="hero"><div><span class="eyebrow">YOUR STUDIO, IN FOCUS</span><h2>Make room for great work.</h2><p>Three projects. One place to keep things moving.</p><button data-page="Tasks">＋ Add a task</button></div><div class="orbit"><span>BF</span><i></i><b>QUALITY FIRST</b></div></div><div class="stats"><article><small>Active projects</small><strong>${state.projects.filter((p) => p.enabled).length}<span> / 3</span></strong></article><article><small>Ready for work</small><strong>${state.tasks.filter((t) => t.status === "queued").length}</strong></article><article><small>Needs your attention</small><strong>${state.tasks.filter((t) => ["blocked", "review"].includes(t.status)).length}</strong></article><article><small>Next daily report</small><strong>22:00<span> IST</span></strong></article></div><div class="section-title"><h2>Your projects</h2><button class="text" data-page="Projects">View all projects →</button></div>${projects()}<div class="two-col"><section class="panel"><div class="section-title"><h2>Work queue</h2>${badge("quality first")}</div>${taskRows(state.tasks.filter((t) => t.status !== "done").slice(0, 3))}</section><section class="panel"><h2>Studio rhythm</h2><div class="timeline"><div><b>22:00</b><span>Daily report<small>Progress, checks & decisions</small></span></div><div><b>23:00</b><span>Breathing space<small>All worker activity pauses</small></span></div><div><b>00:00</b><span>Ready to resume<small>Within your plan’s limits</small></span></div></div><p class="muted">Asia/Kolkata · ${now.date}</p></section></div>`;
 }
 function tasks() {
-  return `<section class="panel"><h2>A task worth doing, done well.</h2><form id="task-form"><div class="form-row"><label>Project<select name="projectId">${options()}</select></label><label>Priority<select name="priority"><option value="1">Normal</option><option value="2">High</option><option value="3">Urgent</option></select></label></div><label>Task title<input name="title" required maxlength="180" placeholder="What should we improve?"></label><label>Acceptance criteria<textarea name="acceptance" maxlength="12000" required placeholder="What should be true when this is ready for review?"></textarea></label><button>Add approved task</button><p class="muted">Queued tasks are authorized for local work. Completion goes to review; releases stay with you.</p></form></section><div class="section-title"><h2>Task board</h2><label><span class="sr">Filter tasks</span><select id="task-filter"><option value="all">All projects</option>${options()}</select></label></div><section class="panel">${taskRows(state.tasks.filter((t) => filter === "all" || t.projectId === filter))}</section>`;
+  return `<section class="panel"><h2>A task worth doing, done well.</h2><form id="task-form"><div class="form-row"><label>Project<select name="projectId">${options()}</select></label><label>Priority<select name="priority"><option value="1">Normal</option><option value="2">High</option><option value="3">Urgent</option></select></label></div><label>Work on<select name="target" id="task-target">${TARGETS["sikhi-khoj"].map((t) => `<option value="${t.id}">${esc(t.name)}</option>`).join("")}</select></label><label>Task title<input name="title" required maxlength="180" placeholder="What should we improve?"></label><label>Acceptance criteria<textarea name="acceptance" maxlength="12000" required placeholder="What should be true when this is ready for review?"></textarea></label><button>Add approved task</button><p class="muted">Queued tasks are authorized for local work. Completion goes to review; releases stay with you.</p></form></section><div class="section-title"><h2>Task board</h2><label><span class="sr">Filter tasks</span><select id="task-filter"><option value="all">All projects</option>${options()}</select></label></div><section class="panel">${taskRows(state.tasks.filter((t) => filter === "all" || t.projectId === filter))}</section>`;
 }
 function feedback() {
   return `<section class="panel"><h2>From conversation to direction</h2><p class="muted">Discuss ideas in chat, then capture the agreed feedback here. Feedback becomes work only when you create an approved task.</p><form id="feedback-form"><label>Project<select name="projectId">${options()}</select></label><label>Feedback<textarea name="body" required maxlength="8000" placeholder="What worked, what needs changing, and why?"></textarea></label><label>Conversation or source link (optional)<input name="source" type="url" pattern="https?://.*" maxlength="2000" placeholder="https://…"></label><button>Save feedback</button></form></section><section class="panel"><h2>Feedback inbox</h2>${state.feedback.length ? state.feedback.map((f) => `<article class="task"><div><small>${esc(name(f.projectId))} · ${new Date(f.createdAt).toLocaleDateString()}</small><p>${esc(f.body)}</p>${/^https?:\/\//i.test(f.source) ? `<a href="${esc(f.source)}" rel="noopener noreferrer" target="_blank">Open conversation ↗</a>` : ""}</div>${badge("captured")}</article>`).join("") : '<div class="empty"><h3>Ready for your perspective</h3><p>Agreed feedback will appear here.</p></div>'}</section>`;
@@ -79,7 +81,7 @@ function reports() {
   }</section>`;
 }
 function settings() {
-  return `<div class="two-col"><section class="panel"><h2>Worker connection</h2>${badge(state.worker.status)}<p>${state.worker.lastSeen ? "Last seen " + esc(new Date(state.worker.lastSeen).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })) + " IST" : "No local worker heartbeat received."}</p><p class="muted">${mode === "demo" ? "Demo controls do not start a worker." : "The local worker must also be configured and enabled on the laptop."}</p><button id="worker-toggle">${state.settings.workerEnabled ? "Pause scheduling" : "Allow scheduling"}</button><h3>Operating policy</h3><p>11 PM–midnight pause · skip blocked tasks · branches and PRs · user-controlled releases.</p></section><section class="panel"><h2>Usage & limits</h2><strong class="usage">${state.worker.quota == null ? "Unavailable" : esc(state.worker.quota) + "% used"}</strong><p>Account quota percentages require a supported quota source. Execution token counts are recorded separately in worker checkpoints.</p><div class="notice">No purchased credits. No API billing fallback.</div></section></div><section class="panel"><h2>Connection checklist</h2><ul><li>GitHub owner: brainforgegames</li><li>Firebase: ${mode === "demo" ? "pending setup" : "configured"}</li><li>Sikhi Khoj repository: awaiting mapping confirmation</li><li>Drivenix & Reflex Trainer: transfers pending</li><li>Worker activation: local setup required</li></ul></section>`;
+  return `<div class="two-col"><section class="panel"><h2>Worker connection</h2>${badge(state.worker.status)}<p>${state.worker.lastSeen ? "Last seen " + esc(new Date(state.worker.lastSeen).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })) + " IST" : "No local worker heartbeat received."}</p><p class="muted">${mode === "demo" ? "Demo controls do not start a worker." : "The local worker must also be configured and enabled on the laptop."}</p><button id="worker-toggle">${state.settings.workerEnabled ? "Pause scheduling" : "Allow scheduling"}</button><h3>Operating policy</h3><p>11 PM–midnight pause · skip blocked tasks · branches and PRs · user-controlled releases.</p></section><section class="panel"><h2>Usage & limits</h2><strong class="usage">${state.worker.quota == null ? "Unavailable" : esc(state.worker.quota) + "% used"}</strong><p>Account quota percentages require a supported quota source. Execution token counts are recorded separately in worker checkpoints.</p><div class="notice">No purchased credits. No API billing fallback.</div></section></div><section class="panel"><h2>Connection checklist</h2><ul><li>GitHub owner: brainforgegames</li><li>Firebase: ${mode === "demo" ? "pending setup" : "configured"}</li><li>Sikhi Khoj: Unity app and website repositories identified</li><li>Drivenix & Reflex Trainer: transfers pending</li><li>Worker activation: local setup required</li></ul></section>`;
 }
 function render() {
   const gated = mode === "firebase" && (!auth || auth.denied || auth.error);
@@ -102,6 +104,15 @@ async function act(fn) {
   }
 }
 function bind() {
+  const projectSelect = document.querySelector('#task-form [name="projectId"]');
+  if (projectSelect)
+    projectSelect.onchange = () => {
+      document.querySelector("#task-target").innerHTML = TARGETS[
+        projectSelect.value
+      ]
+        .map((t) => `<option value="${t.id}">${esc(t.name)}</option>`)
+        .join("");
+    };
   document.querySelectorAll("[data-page]").forEach(
     (el) =>
       (el.onclick = () => {
@@ -146,18 +157,16 @@ function bind() {
       ),
     );
   });
-  document
-    .querySelectorAll("[data-status]")
-    .forEach(
-      (el) =>
-        (el.onchange = () =>
-          act(() =>
-            save("tasks", el.dataset.status, {
-              status: el.value,
-              updatedAt: Date.now(),
-            }),
-          )),
-    );
+  document.querySelectorAll("[data-status]").forEach(
+    (el) =>
+      (el.onchange = () =>
+        act(() =>
+          save("tasks", el.dataset.status, {
+            status: el.value,
+            updatedAt: Date.now(),
+          }),
+        )),
+  );
   const f = document.querySelector("#task-filter");
   if (f) {
     f.value = filter;
@@ -197,15 +206,13 @@ function bind() {
         );
       }),
   );
-  document
-    .querySelector("#worker-toggle")
-    ?.addEventListener("click", () =>
-      act(() =>
-        save("settings", "global", {
-          workerEnabled: !state.settings.workerEnabled,
-        }),
-      ),
-    );
+  document.querySelector("#worker-toggle")?.addEventListener("click", () =>
+    act(() =>
+      save("settings", "global", {
+        workerEnabled: !state.settings.workerEnabled,
+      }),
+    ),
+  );
 }
 render();
 void boot(

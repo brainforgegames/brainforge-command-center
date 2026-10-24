@@ -29,6 +29,21 @@ export const PROJECTS = [
 ];
 export const QUALITY =
   "Prioritize quality and correctness over speed. Consider edge cases, accessibility, security, and the user experience. Run relevant checks, document evidence, use branches and PRs, and leave all releases to the user. If blocked, record the reason and continue another eligible task. Never purchase credits or use API-key billing.";
+export const TARGETS = {
+  "sikhi-khoj": [
+    { id: "app", name: "Unity app", repository: "brainforgegames/Sikhi_Khoj" },
+    {
+      id: "website",
+      name: "Website",
+      repository: "brainforgegames/sikhi-khoj-app",
+    },
+  ],
+  drivenix: [{ id: "app", name: "App" }],
+  "reflex-trainer": [{ id: "app", name: "App" }],
+};
+export const targetName = (task) =>
+  TARGETS[task.projectId]?.find((t) => t.id === (task.target || "app"))?.name ||
+  "App";
 export function initialState() {
   return {
     projects: structuredClone(PROJECTS),
@@ -88,7 +103,13 @@ export function selectTask(projects, tasks, served = {}) {
             t.status === "queued" &&
             t.approved === true,
         )
-        .sort((a, b) => b.priority - a.priority || a.createdAt - b.createdAt)[0]
+        .sort(
+          (a, b) =>
+            b.priority - a.priority ||
+            (served[`${p.id}:${a.target || "app"}`] || 0) -
+              (served[`${p.id}:${b.target || "app"}`] || 0) ||
+            a.createdAt - b.createdAt,
+        )[0]
     : null;
 }
 export function validateTask(t) {
@@ -96,6 +117,9 @@ export function validateTask(t) {
     throw Error("Use a task title between 1 and 180 characters.");
   if (!PROJECTS.some((p) => p.id === t.projectId))
     throw Error("Choose a project.");
+  t.target ||= "app";
+  if (!TARGETS[t.projectId].some((target) => target.id === t.target))
+    throw Error("Choose a valid app or website target.");
   if (!t.acceptance?.trim() || t.acceptance.length > 12000)
     throw Error(
       "Add acceptance criteria (up to 12,000 characters) before queuing work.",
