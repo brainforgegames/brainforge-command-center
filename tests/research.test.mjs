@@ -42,3 +42,31 @@ test("company and dashboard strategy stay private with distinct research paths",
     validateProjectTask({ kind: "research" }, { researchOnly: true }),
   );
 });
+
+test("an existing daily task never triggers a duplicate create request", async () => {
+  const { ensureResearchTask } = await import("../orchestrator/research.mjs");
+  assert.equal(
+    await ensureResearchTask(
+      {
+        get: async () => ({ exists: true }),
+        create: async () => assert.fail("Duplicate write submitted"),
+      },
+      {},
+    ),
+    false,
+  );
+  let saved;
+  assert.equal(
+    await ensureResearchTask(
+      {
+        get: async () => ({ exists: false }),
+        create: async (value) => {
+          saved = value;
+        },
+      },
+      { title: "New research" },
+    ),
+    true,
+  );
+  assert.deepEqual(saved, { title: "New research" });
+});

@@ -2,6 +2,13 @@ import { spawnSync } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+export async function ensureResearchTask(ref, data) {
+  // Existing create-only writes stall in the current REST client on HTTP 409.
+  // The single-laptop worker lock serializes creation; check before submitting.
+  if ((await ref.get()).exists) return false;
+  await ref.create(data);
+  return true;
+}
 export function researchPath(date, scope = "") {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw Error("Invalid research date.");
   if (scope && !/^[a-z][a-z0-9-]{0,60}$/.test(scope))

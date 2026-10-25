@@ -1,5 +1,18 @@
 # Validation record
 
+## 2026-10-25 00:04 IST — Windows worker preparation
+
+Implemented a portable Windows worktree root (`LOCALAPPDATA/bcc/w`), an optional absolute `worktreeRoot` in local configuration, bounded hashed task directory names, and command-scoped Git long-path support. Existing task branch registrations, checkpoint locations and legacy folders take precedence over new locations. Ambiguous or missing worktrees and unregistered partial checkouts stop for inspection without reset, deletion, migration or pruning. No existing worktrees, checkpoints, local configuration, game files, registry settings or system security policies were changed. All implementation changes remain uncommitted.
+
+Checks performed in the restricted Windows worker session:
+
+- `node --test tests/*.test.mjs`: blocked by Node child-process `spawn EPERM` before test-file execution.
+- `node --test --test-isolation=none tests/*.test.mjs`: **21 passed, 1 blocked/failed**. Passing checks cover the existing 18 tests plus root selection/absolute-path rejection, bounded collision-resistant names, new/existing branch preparation, command-scoped long paths, checkpoint/registered path precedence, spaces, dirty-file preservation and partial-folder preservation. The real Git fixture test fails at its first `git init` with `spawnSync git EPERM`; its long-path checkout and dirty-worktree resumption assertions have not executed.
+- `node "<Node installation>/node_modules/npm/bin/npm-cli.js" run build`: Vite build blocked by esbuild `spawn EPERM` while loading configuration. Dependencies resolve from the existing parent installation. No dependency files were changed. Bare `npm` was also blocked by PowerShell script execution policy; using npm's Node entry point avoids that policy without changing it.
+- `node --check orchestrator/worker.mjs`, `node --check orchestrator/worktrees.mjs` and `git diff --check`: passed.
+
+Remaining verification: the orchestrator must run the complete `npm test` and `npm run build` in its normal execution environment, then retry the approved Drivenix/Sikhi Khoj setup with the new preparation code. The disposable Git integration test creates paths longer than 260 characters and checks that changing the configured root preserves edits in both source and task worktrees. Real project retries were not attempted: project repositories/configuration lie outside this approved worktree, and existing failed index state requires inspection before any recovery. Short paths and Git long-path support prevent known checkout pressure but do not establish that Sikhi Khoj's existing index is healthy. No owner decision is required for these technical follow-ups.
+
 Validated on Windows 11 Home, Intel i7-13620H (10 cores / 16 threads), 32 GB RAM; Node 24.20.0 and Codex CLI 0.163.0-alpha.11. Approximately 233 GB disk space was free at inspection.
 
 - Nine domain/policy tests pass: IST pause boundaries, reporting date/deduplication, weighted time allocation without starvation, disabled/unapproved/blocked task exclusion, quota windows and reset selection, and report expiry.
@@ -20,3 +33,5 @@ Dashboard redesign: permanent charcoal theme; Today/Projects/Work board/Your hel
 The first daily report was published at 22:00:45 IST on 2026-10-24 by the independent report job; its existing record was upgraded with readable sections without changing its publication or expiry timestamps.
 
 Brand and allocation update: 18 unit tests and four Firestore integration tests pass. Added five-project allocation checks, exact percentage rounding, weighted scheduling with saved shares, zero-share exclusion, atomic batch rejection and wrong-account protection. Distinct private research paths are tested against path traversal/public review publication. Browser checks verified the separate Time split menu, invalid-total blocking, suggested preset, successful save confirmation and saved card percentages. Phone width 390px has no horizontal overflow; all five inputs remain in view. Existing admin access remains required.
+
+25 Oct recovery verification: all 23 unit tests now pass in the independent Windows runner, including the real long-path/dirty-worktree test. Fixed fixture line-ending isolation and canonical Windows path return values. Vite build passes. Actual Drivenix and Sikhi Khoj working copies were created successfully under the short local root and both report a clean Git status. Old partial worktrees and source checkout edits were preserved. Duplicate daily-research creation was reproduced as a stalled client request; idle scheduling now reads before creating, with a regression test. Explicit retries use fresh identities to preserve failed attempts. A verify result lets the independent runner execute fixed quality checks when the AI sandbox cannot spawn them; unresolved product issues still block. Application-native SQLite/InputSystem setup and a full overnight recovery trial remain to be verified.
