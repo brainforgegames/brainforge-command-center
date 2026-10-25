@@ -5,6 +5,7 @@
   "codexExecutable": "codex.exe",
   "maxRunMinutes": 25,
   "publishPullRequests": false,
+  "worktreeRoot": "",
   "projects": {
     "sikhi-khoj": {
       "repositories": {

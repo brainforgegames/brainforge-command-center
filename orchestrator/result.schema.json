@@ -1,7 +1,7 @@
 {
   "type": "object",
   "properties": {
-    "status": { "type": "string", "enum": ["review", "blocked"] },
+    "status": { "type": "string", "enum": ["review", "blocked", "verify"] },
     "summary": { "type": "string" },
     "ownerUpdate": {
       "type": "object",
