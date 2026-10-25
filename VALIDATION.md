@@ -129,3 +129,13 @@ Unity opt-in as disabled until matching-editor validation succeeds. No owner
 decision is needed. All task changes remain uncommitted; nothing was pushed,
 merged, released or published.
 Independent runner: a clean dependency install, all 32 tests, and the production build pass. A real minimal source copy imported and compiled successfully with exact Unity 6000.3.26f1, with its editor log retained outside the disposable copy. Immediate cleanup encountered a temporary Windows directory lock; bounded cleanup retries were added. No device tests claimed.
+
+## 2026-10-26 — Earlier context for private research
+
+- Prompt construction now loads prior research only after a private research task is claimed/prepared, immediately before execution (including resume). Idle ticks, public research and implementation do not read this context.
+- Firestore lookup is restricted to the same project, research kind and review/done statuses, ordered by updatedAt descending and document ID ascending, with at most 12 candidates. The prompt includes at most 3 records and 12,000 characters, with bounded individual excerpts and explicit untrusted-reference boundaries. Only researchBody and its update time enter the reference; task metadata, result summaries and unrelated projects are excluded. Credential-like and email-containing bodies are omitted conservatively.
+- Empty and failed lookups give explicit limitations without exposing service errors. The composite index definition is included in firestore.indexes.json; it has not been deployed or verified against a live service. Missing index/access falls back safely to unavailable context.
+- Private raw event/stderr logs omit content to avoid persisting echoed reference text. Context is passed on stdin only; no dashboard source or public PR body receives the reference. The worker is instructed not to reproduce historical reference text in task results.
+- Checks: all 7 research tests pass; the full in-process Node suite has 35 passing tests and one sandbox-blocked Git subprocess test (spawnSync git EPERM). Standard npm test is blocked by test-runner child-process spawn EPERM. Vite build was attempted through its installed Node entry point and is blocked by esbuild spawn EPERM. Worker/research syntax checks and git diff --check pass. Independent configured checks remain required outside this sandbox.
+- Scheduling, pause, quota, report and public review policies are unchanged. No service deployment, publication, push or commit was performed.
+Independent verification on 26 October: clean locked dependency installation, all 36 Node tests and production build pass. Live Firestore index deployment and same-project context lookup are being verified separately; no claim of native/device testing.
