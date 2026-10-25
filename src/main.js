@@ -104,16 +104,23 @@ function today() {
   const s = studioSummary(state),
     w = workerView(state),
     upcoming = s.active[0] || s.planned[0];
-  return `<section class="hero"><div><span class="eyebrow">YOUR DAILY STUDIO BRIEF</span><h2>Good ideas.<br>Thoughtful progress.</h2><p>Your games, your company, your next move.</p></div><div class="live-card"><span class="live-indicator ${esc(w.tone)}"></span><strong>${esc(w.title)}</strong><p>${esc(w.detail)}</p><small>Last check-in · ${esc(when(state.worker.lastSeen))}</small></div></section><div class="stats"><article><small>Updates today</small><strong>${s.today.length}</strong><span>Latest progress below</span></article><article><small>Total open work</small><strong>${s.open.length}</strong><span class="work-breakdown">${s.active.length} underway · ${s.planned.length} planned<br>${s.checking.length} in checks · ${s.issues.length} waiting on fixes</span></article><article class="attention-stat"><small>Questions for you</small><strong>${s.questions.length}</strong><button class="text" data-page="Your help">${s.questions.length ? "See what I need →" : "You’re all caught up →"}</button></article><article><small>Evening report</small><strong>10 PM</strong><span>Every day · India time</span></article></div><div class="brief-grid"><section class="brief"><span class="step-number">01</span><h2>What was done today</h2>${
+  return `<section class="hero"><div><span class="eyebrow">YOUR DAILY STUDIO BRIEF</span><h2>Good ideas.<br>Thoughtful progress.</h2><p>Your games, your company, your next move.</p></div><div class="live-card"><span class="live-indicator ${esc(w.tone)}"></span><strong>${esc(w.title)}</strong><p>${esc(w.detail)}</p><small>Last check-in · ${esc(when(state.worker.lastSeen))}</small></div></section><div class="stats"><article><small>Updates today</small><strong>${s.today.length}</strong><span>Latest progress below</span></article><article><small>Total open work</small><strong>${s.open.length}</strong><span class="work-breakdown">${s.active.length} underway · ${s.planned.length} planned<br>${s.checking.length} in checks · ${s.issues.length} waiting on fixes</span></article><article class="attention-stat"><small>Questions for you</small><strong>${s.questions.length}</strong><button class="text" data-page="Your help">${s.questions.length ? "See what I need →" : "You’re all caught up →"}</button></article><article><small>Evening report</small><strong>10 PM</strong><span>Every day · India time</span></article></div><div class="brief-grid"><section class="brief"><span class="step-number">01</span><h2>Completed today</h2>${
     s.completed.length
       ? `<ul class="brief-list">${s.completed
           .slice(0, 3)
           .map(
             (t) =>
-              `<li><b>${esc(names(t.projectId))}</b><span>${esc(ownerView(t).done)}</span></li>`,
+              `<li><b>${esc(names(t.projectId))}</b><span>${esc(ownerView(t).done)}</span><small>${esc(when(stamp(t)))}</small></li>`,
           )
           .join("")}</ul>`
       : "<p>No completed result recorded today yet. In-progress work stays in the work board.</p>"
+  }<h2>Ready for review today</h2><small>I handle the review. These results are not completed yet.</small>${
+    s.readyForReview.length
+      ? `<ul class="brief-list">${s.readyForReview
+          .slice(0, 3)
+          .map((t) => `<li><b>${esc(names(t.projectId))}</b><span>${esc(ownerView(t).done)}</span><small>${esc(when(stamp(t)))}</small></li>`)
+          .join("")}</ul>`
+      : "<p>No results ready for review today.</p>"
   }</section><section class="brief"><span class="step-number">02</span><h2>What got in the way</h2>${
     s.issues.length
       ? `<ul class="brief-list">${s.issues

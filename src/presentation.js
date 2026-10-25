@@ -2,7 +2,7 @@ import { istParts } from "./domain.js";
 export const statusLabels = {
   queued: "Planned",
   running: "In progress",
-  review: "Final checks",
+  review: "Ready for review",
   blocked: "Issue to resolve",
   done: "Completed",
 };
@@ -84,7 +84,8 @@ export function studioSummary(state, now = Date.now(), includeStudio = true) {
     open: state.tasks.filter((t) => t.status !== "done"),
     checking: tasks.filter((t) => t.status === "review"),
     today,
-    completed: today.filter((t) => ["review", "done"].includes(t.status)),
+    completed: today.filter((t) => t.status === "done"),
+    readyForReview: today.filter((t) => t.status === "review"),
     issues: tasks.filter((t) => t.status === "blocked"),
     questions: tasks
       .filter((t) => t.status !== "done" && ownerView(t).question)

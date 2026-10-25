@@ -76,3 +76,15 @@ Independent follow-up on 25 October 2026:
 - A clean locked dependency installation completed; all 27 tests pass, including the real Windows Git test, and the production build passes.
 - Retried the isolated real-editor helper with Unity 6000.0.66f2 outside the AI sandbox. The editor refused to compile because its licensing client reported no valid license (exit 198). This does not prove a compilation pass. The opt-in Unity configuration remains disabled on real projects until their matching editor is verified.
 - Source-preservation and exact-version behavior pass automated tests. No phone/device or gameplay validation is claimed.
+
+## 25 October 2026 - completed work versus review work
+
+- Today and new daily reports now list only `done` results under Completed today and list today's `review` results separately under Ready for review today.
+- Review stays with the worker; it does not create an owner question. Existing explicit requests for decisions, information or access are unchanged.
+- Both groups retain IST timestamps and use the existing dark styles and phone-stacking layout; no Firebase access or scheduling policy changed.
+- Focused presentation tests: 5/5 pass with `node --test --experimental-test-isolation=none tests/presentation.test.mjs`, including review-only and mixed days and IST midnight exclusion.
+- Full suite using that in-process test option: 28/29 pass; the real Git worktree test cannot spawn Git (`EPERM`). Configured `npm.cmd test` cannot spawn any test subprocess (`EPERM`).
+- Build attempted via `npm.cmd run build` (initially no installed Vite) and direct Vite after offline dependency extraction: esbuild cannot spawn (`EPERM`). No production build success or browser visual verification claimed; independent runner must run the configured tests and build.
+- JavaScript syntax checks and `git diff --check` pass. Changes remain uncommitted; nothing was pushed, merged, deployed or published.
+- Offline dependency installation was stopped after extracting Vite; installation completion is not claimed, so the independent runner should start with a clean locked install.
+Independent verification on 25 October: a clean locked dependency install completed, all 29 tests passed (including real Windows Git checkout), and the production build passed. No new browser visual test was performed for this text/grouping change.
