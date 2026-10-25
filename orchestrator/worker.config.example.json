@@ -15,7 +15,8 @@
           "baseBranch": "main",
           "unity": {
             "editor": "",
-            "timeoutMs": 300000
+            "timeoutMs": 300000,
+            "copyRoot": ""
           },
           "checks": []
         },
@@ -49,6 +50,10 @@
       "checks": [
         [
           "npm",
+          "ci"
+        ],
+        [
+          "npm",
           "test"
         ],
         [
@@ -66,6 +71,10 @@
       "privateResearch": true,
       "researchOnly": false,
       "checks": [
+        [
+          "npm",
+          "ci"
+        ],
         [
           "npm",
           "test"
