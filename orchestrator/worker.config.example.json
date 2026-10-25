@@ -13,6 +13,10 @@
           "path": "",
           "repository": "brainforgegames/Sikhi_Khoj",
           "baseBranch": "main",
+          "unity": {
+            "editor": "",
+            "timeoutMs": 300000
+          },
           "checks": []
         },
         "website": {

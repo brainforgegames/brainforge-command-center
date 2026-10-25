@@ -2,6 +2,7 @@ node_modules/
 dist/
 .env*
 !.env.example
+# Worker state and disposable Unity projects/editor logs stay local.
 .local/
 *-debug.log
 worker.config.json
