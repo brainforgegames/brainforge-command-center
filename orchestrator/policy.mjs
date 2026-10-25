@@ -1,5 +1,5 @@
 import { isPaused, istParts, selectTask } from "../src/domain.js";
-import { ownerView, studioSummary } from "../src/presentation.js";
+import { ownerView, studioSummary, stamp, when } from "../src/presentation.js";
 export { isPaused, istParts, selectTask };
 export function nextPause(now = new Date()) {
   const p = istParts(now);
@@ -44,14 +44,21 @@ export function makeReport(state, date, now = Date.now()) {
         `${{ "sikhi-khoj": "Sikhi Khoj", drivenix: "Drivenix", studio: "Brainforge studio", "brainforge-company": "Brainforge Games", "bcc-improvements": "BCC Improvements", "reflex-trainer": "Reflex Trainer" }[t.projectId] || "Project"}: `;
       return [
         {
-          heading: "What was done",
+          heading: "Completed today",
           items: s.completed
-            .map((t) => label(t) + ownerView(t).done)
+            .map((t) => label(t) + ownerView(t).done + " \u00b7 " + when(stamp(t)))
             .concat(
               s.completed.length
                 ? []
                 : ["No completed result recorded today yet."],
             ),
+        },
+        {
+          heading: "Ready for review today",
+          items: s.readyForReview
+            .map((t) => label(t) + ownerView(t).done + " \u00b7 " + when(stamp(t)))
+            .concat(s.readyForReview.length ? [] : ["No results ready for review today."])
+            .concat(["I handle the review. These results are not completed yet."]),
         },
         {
           heading: "What got in the way",

@@ -50,8 +50,8 @@ test("today respects India midnight, updates sort newest first, reports share ow
   );
   assert.equal(recentFirst(s.tasks)[0].id, "new");
   const report = makeReport(s, "2026-10-25", now);
-  assert.match(report.sections[0].items[0], /Reviewed the quiz flow/);
-  assert.match(report.sections[3].items[0], /Nothing needed/);
+  assert.match(report.sections.find((s) => s.heading === "Ready for review today").items[0], /Reviewed the quiz flow/);
+  assert.match(report.sections.find((s) => s.heading === "Your help").items[0], /Nothing needed/);
 });
 test("offline heartbeat is not presented as active work", () => {
   const s = initialState(),
@@ -63,3 +63,30 @@ test("offline heartbeat is not presented as active work", () => {
   s.worker.lastSeen = now;
   assert.equal(workerView(s, now).title, "Work is moving");
 });
+
+for (const mixed of [false, true]) {
+  test(mixed ? "mixed days separate completed and review results" : "review-only days have no completed results", () => {
+    const state = initialState();
+    const now = Date.parse("2026-10-25T00:10:00+05:30");
+    state.tasks = [
+      { id: "review", status: "review", updatedAt: now, ownerUpdate: { done: "Quiz ready for checks." } },
+      { id: "yesterday", status: "done", updatedAt: Date.parse("2026-10-24T23:59:59+05:30") },
+      { id: "old-review", status: "review", updatedAt: Date.parse("2026-10-24T23:59:59+05:30") },
+      ...(mixed ? [{ id: "done", status: "done", updatedAt: Date.parse("2026-10-25T00:00:00+05:30"), ownerUpdate: { done: "Scoring fixed." } }] : []),
+    ];
+    const summary = studioSummary(state, now);
+    assert.deepEqual(summary.completed.map((t) => t.id), mixed ? ["done"] : []);
+    assert.deepEqual(summary.readyForReview.map((t) => t.id), ["review"]);
+    assert.equal(summary.checking.length, 2);
+    assert.equal(summary.questions.length, 0);
+    const report = makeReport(state, "2026-10-25", now);
+    const completed = report.sections.find((s) => s.heading === "Completed today").items.join(" ");
+    const review = report.sections.find((s) => s.heading === "Ready for review today").items.join(" ");
+    assert.doesNotMatch(completed, /Quiz ready/);
+    assert.match(completed, mixed ? /Scoring fixed.*IST/ : /No completed result/);
+    assert.match(review, /Quiz ready.*IST/);
+    assert.doesNotMatch(review, /Scoring fixed/);
+    assert.match(review, /I handle the review/);
+    assert.match(report.sections.find((s) => s.heading === "Your help").items[0], /Nothing needed/);
+  });
+}
