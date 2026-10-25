@@ -19,6 +19,7 @@ import {
   retryAt,
 } from "./policy.mjs";
 import { readQuota } from "./quota.mjs";
+import { prepareUnity } from "./unity.mjs";
 import { database } from "./database.mjs";
 import {
   canonicalRemote,
@@ -571,47 +572,67 @@ async function tick() {
           ],
         ]
       : project.checks;
-  for (const check of checks) {
-    if (
-      isPaused(new Date()) ||
-      !(await db.doc("settings/global").get()).data()?.workerEnabled
-    ) {
-      await status("Checkpointed before quality checks");
-      return;
-    }
-    if (
-      !Array.isArray(check) ||
-      !check.length ||
-      check.some((x) => typeof x !== "string")
-    )
-      throw Error("Each quality check must be a command argument array.");
-    const c = await command(check[0], check.slice(1), work, {
-      timeout: Math.max(
-        1,
-        Math.min(300000, nextPause().getTime() - Date.now()),
-      ),
-    });
-    evidence.push({ command: check.join(" "), passed: c.code === 0 });
-    if (c.code !== 0) {
-      await db.doc("tasks/" + task.id).update({
-        status: "blocked",
-        blockedReason: "Quality check failed: " + check.join(" "),
-        ownerUpdate: {
-          ...result.ownerUpdate,
-          issue:
-            "The result did not pass a required check. I need to fix it before it is ready.",
-          next: "Inspect the failed check, correct the problem and run the checks again.",
-          needsOwner: false,
-          question: "",
-          answerHint: "",
-        },
-        evidence,
-        updatedAt: Date.now(),
+  let unity;
+  try {
+    if (task.kind !== "research" && project.unity) {
+      if (isPaused(new Date()) || !(await db.doc("settings/global").get()).data()?.workerEnabled)
+        return;
+      unity = await prepareUnity({
+        source: work,
+        config: project.unity,
+        local: path.join(local, "unity-verification"),
+        run: (exe, args, cwd, opts) => command(exe, args, cwd, {
+          ...opts,
+          timeout: Math.max(1, Math.min(opts.timeout, nextPause().getTime() - Date.now())),
+          shouldStop: async () => isPaused(new Date()) || !(await db.doc("settings/global").get()).data()?.workerEnabled,
+        }),
       });
-      cp.task = null;
-      await checkpoint();
-      return;
+      evidence.push({ command: `Unity ${unity.version} import/compile`, passed: true, log: unity.log });
     }
+    for (const check of checks) {
+      if (
+        isPaused(new Date()) ||
+        !(await db.doc("settings/global").get()).data()?.workerEnabled
+      ) {
+        await status("Checkpointed before quality checks");
+        return;
+      }
+      if (
+        !Array.isArray(check) ||
+        !check.length ||
+        check.some((x) => typeof x !== "string")
+      )
+        throw Error("Each quality check must be a command argument array.");
+      const c = await command(check[0], check.slice(1), unity?.work || work, {
+        timeout: Math.max(
+          1,
+          Math.min(300000, nextPause().getTime() - Date.now()),
+        ),
+      });
+      evidence.push({ command: check.join(" "), passed: c.code === 0 });
+      if (c.code !== 0) {
+        await db.doc("tasks/" + task.id).update({
+          status: "blocked",
+          blockedReason: "Quality check failed: " + check.join(" "),
+          ownerUpdate: {
+            ...result.ownerUpdate,
+            issue:
+              "The result did not pass a required check. I need to fix it before it is ready.",
+            next: "Inspect the failed check, correct the problem and run the checks again.",
+            needsOwner: false,
+            question: "",
+            answerHint: "",
+          },
+          evidence,
+          updatedAt: Date.now(),
+        });
+        cp.task = null;
+        await checkpoint();
+        return;
+      }
+    }
+  } finally {
+    await unity?.dispose();
   }
   let pr = null;
   if (publishReview(task, project, cfg.publishPullRequests)) {

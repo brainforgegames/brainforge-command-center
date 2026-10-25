@@ -79,3 +79,31 @@ Time split lives in its own navigation item (inside the burger menu on phones). 
 Weights describe a long-term share of elapsed eligible work time, not reserved clock hours. Blocked or empty projects yield to eligible work. The company and BCC research tasks use distinct document paths and private local worktrees; proposals are saved in authenticated Firestore and are never pushed as public research PRs. The company mapping is research-only. BCC implementation tasks retain normal code checks and review publication.
 
 The idle worker checks for an existing dated research task before submitting a create-only write, avoiding stalled duplicate requests in the current REST client. An administrator may increment a task's positive integer attempt to prepare a fresh isolated retry while preserving older folders. The AI can return verify when only sandbox process permissions prevented configured checks; the orchestrator still runs every configured check before review status. Product blockers are not promoted through this path.
+# Controlled Unity verification
+
+For a Unity app repository, opt in with `unity` beside its existing `checks` in
+the local worker configuration (see the app entry in the example). Set `editor`
+to the absolute installed Unity executable path and `timeoutMs` to 1000–900000
+milliseconds (default 300000). Leave Unity configuration absent for other repos.
+The example's empty editor path must be filled before enabling the app.
+
+The worker reads `ProjectSettings/ProjectVersion.txt` and compares the complete
+`m_EditorVersion` with the installed editor's `-version` output before import.
+A missing editor or any mismatch blocks verification; it never selects a newer
+editor or changes project versions, licensing or security settings.
+
+Unity verification always uses a fresh disposable copy, including current edits,
+untracked source, package locks and importer `.meta` files. It excludes generated
+`Library`, `Temp`, `Logs`, `obj`, Git state and Node dependencies. Linked source
+trees are rejected rather than followed. Unity runs hidden with fixed batch,
+headless and quit flags, a timeout and the worker's pause/disable monitoring.
+The configured checks then run in this imported copy, so they can consume freshly
+generated assemblies. Configure commands relative to that copy; it has no Git
+metadata or preinstalled Node dependencies. No arbitrary Unity execute method,
+store publication or license command is added.
+
+The copy is removed after checks or failure; editor logs remain under ignored
+`.local/unity-verification/` for diagnosis. Only the original task checkout is
+eligible for later staging, so import-generated source/metadata and logs never
+enter its diff. A successful import/compile is editor evidence, not an EditMode,
+PlayMode or device test; keep required test commands in `checks`.

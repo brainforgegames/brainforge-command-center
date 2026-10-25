@@ -35,3 +35,44 @@ The first daily report was published at 22:00:45 IST on 2026-10-24 by the indepe
 Brand and allocation update: 18 unit tests and four Firestore integration tests pass. Added five-project allocation checks, exact percentage rounding, weighted scheduling with saved shares, zero-share exclusion, atomic batch rejection and wrong-account protection. Distinct private research paths are tested against path traversal/public review publication. Browser checks verified the separate Time split menu, invalid-total blocking, suggested preset, successful save confirmation and saved card percentages. Phone width 390px has no horizontal overflow; all five inputs remain in view. Existing admin access remains required.
 
 25 Oct recovery verification: all 23 unit tests now pass in the independent Windows runner, including the real long-path/dirty-worktree test. Fixed fixture line-ending isolation and canonical Windows path return values. Vite build passes. Actual Drivenix and Sikhi Khoj working copies were created successfully under the short local root and both report a clean Git status. Old partial worktrees and source checkout edits were preserved. Duplicate daily-research creation was reproduced as a stalled client request; idle scheduling now reads before creating, with a regression test. Explicit retries use fresh identities to preserve failed attempts. A verify result lets the independent runner execute fixed quality checks when the AI sandbox cannot spawn them; unresolved product issues still block. Application-native SQLite/InputSystem setup and a full overnight recovery trial remain to be verified.
+# Controlled Unity verification — 2026-10-25
+
+Implementation evidence in this worktree: four Unity guard tests pass with
+`node --test --test-isolation=none tests/unity.test.mjs`. They cover exact release
+matching (including patch/suffix), refusal before import on mismatch, byte-for-byte
+preservation of dirty source/untracked files/binary `.meta` contents despite
+simulated importer changes, zero-exit compiler errors, cleanup with retained logs,
+and rejection of nested destinations and linked source trees. These are filesystem
+and mocked-editor tests, not real app or device tests. Syntax and `git diff --check`
+pass. A first copy implementation using native `fs.cp` stalled in this sandbox;
+the final implementation uses exclusive streaming copies and the same tests finish.
+
+Required Node checks were attempted: `npm.cmd test` cannot spawn isolated test
+processes (`EPERM`). The final full suite with test isolation disabled passed
+26/27 tests; the existing real Git integration test cannot spawn Git
+(`spawnSync git EPERM`). All four Unity tests pass.
+PowerShell's npm script wrapper is disabled, so commands use `npm.cmd` without
+changing execution policy. Dependency installation was interrupted after stalling;
+an offline rebuild without scripts then restored the command shims successfully.
+Both `npm.cmd run build` and the direct Vite entry reach esbuild and fail with
+`spawn EPERM`. A clean dependency install, full `npm test` and `npm run build`
+remain mandatory in the independent runner; no build success is claimed.
+
+Real editor attempt (separate from mocks): the installed
+`C:\Program Files\Unity\Hub\Editor\6000.0.66f2\Editor\Unity.exe -version`
+returned exactly `6000.0.66f2`. A fresh minimal project with that ProjectVersion,
+an empty package manifest and one C# source file was started using hidden
+`-batchmode -nographics -quit -projectPath ... -logFile ...` execution with a
+45-second upper bound. Unity started but exited 1 after its Package Manager could
+not connect to the local IPC server after 30 seconds. The log is retained at
+ignored `.local/unity-real/editor.log`. No successful compilation, application
+verification, EditMode/PlayMode or device testing is claimed. No real app checkout
+outside the approved worktree was touched. Licensing/security settings were not
+changed. This IPC failure must be retried in the normal worker environment; its
+precise cause is unconfirmed, while Node child-process permission failures are
+explicit. The independent runner must also verify the configured real app with
+its exact editor and required app checks before accepting editor verification.
+Independent follow-up on 25 October 2026:
+- A clean locked dependency installation completed; all 27 tests pass, including the real Windows Git test, and the production build passes.
+- Retried the isolated real-editor helper with Unity 6000.0.66f2 outside the AI sandbox. The editor refused to compile because its licensing client reported no valid license (exit 198). This does not prove a compilation pass. The opt-in Unity configuration remains disabled on real projects until their matching editor is verified.
+- Source-preservation and exact-version behavior pass automated tests. No phone/device or gameplay validation is claimed.
