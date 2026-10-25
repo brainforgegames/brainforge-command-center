@@ -20,7 +20,7 @@ Copy `.env.example` to `.env.local` for a configured build. Never put service-ac
 
 ## Stage 2: local Windows worker
 
-Copy `orchestrator/worker.config.example.json` to `worker.config.json`. It starts disabled. Set local clone paths, confirm the correct repositories and base branches, and provide meaningful check command arrays per project (for example `["npm", "test"]` and `["npm", "run", "build"]` for a project that defines those scripts). On Windows the runner resolves npm through Node rather than a command shell. Both local `enabled` and dashboard `workerEnabled` must be true before development runs.
+Copy `orchestrator/worker.config.example.json` to `worker.config.json`. It starts disabled. Set local clone paths, confirm the correct repositories and base branches, and provide meaningful check command arrays per project (for example `["npm", "ci"]`, `["npm", "test"]` and `["npm", "run", "build"]` for a project that defines those scripts). On Windows the runner resolves npm through Node rather than a command shell. Both local `enabled` and dashboard `workerEnabled` must be true before development runs.
 
 `credentialMode: "firebase-cli"` reuses the existing Firebase CLI login as `brainforgegames@gmail.com` in memory. It creates no service-account key. The Firebase CLI dependency is pinned by the lockfile because this adapter uses its internal token-refresh interface. `adc` is supported for separately configured Google Application Default Credentials. The Firestore adapter uses the authentication library belonging to its transport to avoid incompatible header formats.
 
@@ -107,3 +107,22 @@ The copy is removed after checks or failure; editor logs remain under ignored
 eligible for later staging, so import-generated source/metadata and logs never
 enter its diff. A successful import/compile is editor evidence, not an EditMode,
 PlayMode or device test; keep required test commands in `checks`.
+
+
+### Fresh-checkout dependencies and Unity copy paths
+
+Run `npm ci` from the committed lockfile before `npm test` and `npm run build`
+in every fresh checkout. The example Node check lists run these commands in that
+order; keep the same order in ignored local configuration. Do not rely on a
+parent checkout's dependencies. Unity copies exclude `node_modules`, so Node
+checks in those copies also need a locked install first.
+
+Disposable Unity sources default to `%LOCALAPPDATA%\bcc\u` on Windows, falling
+back to the user's `AppData\Local\bcc\u`, and the OS temporary folder's
+`bcc/u` elsewhere. Optional `unity.copyRoot` selects an absolute writable short
+folder (empty uses the default). Each attempt gets a unique directory; cleanup
+removes only that directory. Logs stay in `.local/unity-verification/`, outside
+the disposable source, on success and failure. Copy roots inside source or
+overlapping log storage, including filesystem aliases, are rejected. No global
+Git or registry setting changes. Keep real-project Unity configuration disabled
+until the exact installed editor has successfully validated that project.

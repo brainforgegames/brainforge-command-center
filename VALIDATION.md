@@ -88,3 +88,44 @@ Independent follow-up on 25 October 2026:
 - JavaScript syntax checks and `git diff --check` pass. Changes remain uncommitted; nothing was pushed, merged, deployed or published.
 - Offline dependency installation was stopped after extracting Vite; installation completion is not claimed, so the independent runner should start with a clean locked install.
 Independent verification on 25 October: a clean locked dependency install completed, all 29 tests passed (including real Windows Git checkout), and the production build passed. No new browser visual test was performed for this text/grouping change.
+
+
+## 2026-10-25 18:31 IST ? Fresh-checkout verification copies
+
+Implemented a separate disposable Unity source root: Windows uses
+`LOCALAPPDATA/bcc/u` (user AppData/Local fallback), other platforms use the OS
+temporary folder's `bcc/u`, and optional `unity.copyRoot` accepts an absolute
+override. Each import gets a unique short directory. Editor logs remain under
+`.local/unity-verification/` and survive success/failure cleanup. Lexical and
+resolved-path guards reject source-contained roots and overlapping log roots,
+including junction aliases. Exact editor matching remains unchanged. No global
+Git, registry or real-project Unity configuration was changed. The ignored local
+configuration is outside this task's scope; example Node checks now run `npm ci`
+before tests/build, and README documents this requirement for fresh checkouts
+and disposable Unity copies.
+
+Validation in this restricted Windows session:
+
+- Focused Unity suite: 7/7 pass, including Windows root selection/fallback,
+  override rejection, exact editor matching, dirty source/untracked/binary meta
+  preservation, compiler-failure cleanup with retained logs, alias rejection,
+  and repeat disposal preserving unrelated files in the copy root.
+- Full suite with `node --test --test-isolation=none tests/*.test.mjs`: 31/32
+  pass; the real Git integration fixture fails at `git init` with `spawnSync git
+  EPERM` before its assertions. Standard `npm.cmd test` cannot spawn test
+  subprocesses (`EPERM`).
+- Clean locked installation was attempted with `npm.cmd ci --no-audit
+  --no-fund` and then bounded offline retries. Installation stalled; the final
+  retry's log stopped at cached package reads and was interrupted. Installation
+  completion is not claimed; ignored node_modules is incomplete.
+- `npm.cmd run build` was attempted and fails because Vite is not installed.
+  This is an additional dependency-install blocker, not proven to be a sandbox
+  process-permission failure, so the task is blocked rather than verify.
+- JavaScript syntax checks and `git diff --check` pass.
+
+Next: the orchestrator must complete a clean locked `npm ci`, run `npm test`
+and `npm run build` in its normal environment, and retain the real-project
+Unity opt-in as disabled until matching-editor validation succeeds. No owner
+decision is needed. All task changes remain uncommitted; nothing was pushed,
+merged, released or published.
+Independent runner: a clean dependency install, all 32 tests, and the production build pass. A real minimal source copy imported and compiled successfully with exact Unity 6000.3.26f1, with its editor log retained outside the disposable copy. Immediate cleanup encountered a temporary Windows directory lock; bounded cleanup retries were added. No device tests claimed.

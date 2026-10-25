@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import os from "node:os";
 import path from "node:path";
 import { mkdtemp, mkdir, writeFile, readFile, readdir, rm, symlink } from "node:fs/promises";
-import { copyUnitySource, prepareUnity, projectVersion, requireEditorVersion } from "../orchestrator/unity.mjs";
+import { copyUnitySource, prepareUnity, projectVersion, requireEditorVersion, unityCopyRoot } from "../orchestrator/unity.mjs";
 
 test("Unity versions require an exact release including patch and suffix", () => {
   assert.equal(projectVersion("m_EditorVersion: 6000.0.66f2\r\nm_EditorVersionWithRevision: ignored\r\n"), "6000.0.66f2");
@@ -30,11 +30,13 @@ test("isolated import preserves dirty source, binary importer metadata and untra
   for (const [name, content] of Object.entries(files)) await writeFile(path.join(source, name), content);
   await writeFile(path.join(source, "Library/stale"), "stale");
   let calls = 0;
-  const result = await prepareUnity({ source, config: { editor: path.resolve("Unity.exe") }, local: path.join(root, "logs"), run: async (exe, args, cwd, opts) => {
+  const result = await prepareUnity({ source, config: { editor: path.resolve("Unity.exe"), copyRoot: path.join(root, "copies") }, local: path.join(root, "logs"), run: async (exe, args, cwd, opts) => {
     assert.ok(opts.timeout <= 900000);
     calls++;
     if (args[0] === "-version") return { code: 0, out: "6000.0.66f2\n" };
     assert.notEqual(cwd, source);
+    assert.equal(path.dirname(cwd), path.join(root, "copies"));
+    assert.ok(!args.at(-1).startsWith(cwd + path.sep));
     assert.ok(args.includes("-batchmode") && args.includes("-quit"));
     assert.deepEqual((await readdir(cwd)).sort(), ["Assets", "Packages", "ProjectSettings"]);
     await writeFile(path.join(cwd, "Assets/Dirty.cs"), "import mutation");
@@ -43,7 +45,10 @@ test("isolated import preserves dirty source, binary importer metadata and untra
     return { code: 0 };
   } });
   assert.equal(calls, 2);
+  await writeFile(path.join(root, "copies", "keep.txt"), "other attempt");
   await result.dispose();
+  await result.dispose();
+  assert.equal(await readFile(path.join(root, "copies", "keep.txt"), "utf8"), "other attempt");
   for (const [name, content] of Object.entries(files)) assert.deepEqual(await readFile(path.join(source, name)), content);
   await assert.rejects(readFile(path.join(result.work, "Assets/Dirty.cs")), { code: "ENOENT" });
   assert.equal(await readFile(result.log, "utf8"), "Import completed");
@@ -56,7 +61,7 @@ test("version mismatch never imports and a zero-exit compilation failure blocks"
   const source = path.join(root, "source");
   await writeFile(path.join(source, "ProjectSettings/ProjectVersion.txt"), "m_EditorVersion: 6000.0.66f2\n");
   let calls = 0;
-  const options = { source, config: { editor: path.resolve("Unity.exe") }, local: path.join(root, "logs") };
+  const options = { source, config: { editor: path.resolve("Unity.exe"), copyRoot: path.join(root, "copies") }, local: path.join(root, "logs") };
   await assert.rejects(prepareUnity({ ...options, run: async () => { calls++; return { code: 0, out: "6000.3.26f1" }; } }), /mismatch/);
   assert.equal(calls, 1);
   await assert.rejects(prepareUnity({ ...options, run: async (exe, args) => {
@@ -66,6 +71,8 @@ test("version mismatch never imports and a zero-exit compilation failure blocks"
   } }), /compilation failed/);
   const folder = (await readdir(options.local))[0];
   assert.deepEqual(await readdir(path.join(options.local, folder)), ["editor.log"]);
+  assert.deepEqual(await readdir(options.config.copyRoot), []);
+  assert.equal(await readFile(path.join(source, "ProjectSettings/ProjectVersion.txt"), "utf8"), "m_EditorVersion: 6000.0.66f2\n");
 });
 
 test("copy guard refuses nested destinations and linked source trees", async (t) => {
@@ -80,4 +87,44 @@ test("copy guard refuses nested destinations and linked source trees", async (t)
   await symlink(path.join(root, "outside"), path.join(source, "linked"), process.platform === "win32" ? "junction" : "dir");
   await assert.rejects(copyUnitySource(source, path.join(root, "copy")), /symbolic links/);
   assert.equal(await readFile(path.join(root, "outside/keep"), "utf8"), "unchanged");
+});
+
+
+test("Unity copy roots are portable, short and require absolute overrides", () => {
+  assert.equal(unityCopyRoot({ platform: "win32", env: { LOCALAPPDATA: "D:\\Local" } }), "D:\\Local\\bcc\\u");
+  assert.equal(unityCopyRoot({ platform: "win32", env: {}, home: "C:\\Users\\Editor" }), "C:\\Users\\Editor\\AppData\\Local\\bcc\\u");
+  assert.equal(unityCopyRoot({ platform: "linux", temp: "/tmp" }), "/tmp/bcc/u");
+  assert.equal(unityCopyRoot({ platform: "win32", configured: "D:\\u" }), "D:\\u");
+  for (const configured of ["relative", "C:relative", "\\rooted", 42, null])
+    assert.throws(() => unityCopyRoot({ platform: "win32", configured }), /absolute/);
+});
+
+test("unsafe copy roots preserve source and existing logs before import", async (t) => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "bcc-unity-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const source = path.join(root, "source"), local = path.join(root, "logs");
+  await mkdir(path.join(source, "ProjectSettings"), { recursive: true });
+  await mkdir(local);
+  await writeFile(path.join(source, "ProjectSettings/ProjectVersion.txt"), "m_EditorVersion: 6000.0.66f2\n");
+  await writeFile(path.join(local, "keep.log"), "retain");
+  for (const copyRoot of [source, path.join(source, "copies"), local, path.join(local, "copies"), root]) {
+    await assert.rejects(prepareUnity({ source, local, config: { editor: path.resolve("Unity.exe"), copyRoot }, run: async (exe, args) => {
+      assert.deepEqual(args, ["-version"]);
+      return { code: 0, out: "6000.0.66f2" };
+    } }), /outside source/);
+  }
+  const alias = path.join(root, "alias");
+  await symlink(local, alias, process.platform === "win32" ? "junction" : "dir");
+  await assert.rejects(prepareUnity({ source, local, config: { editor: path.resolve("Unity.exe"), copyRoot: alias }, run: async () => ({ code: 0, out: "6000.0.66f2" }) }), /outside source/);
+  assert.equal(await readFile(path.join(local, "keep.log"), "utf8"), "retain");
+  assert.equal(await readFile(path.join(source, "ProjectSettings/ProjectVersion.txt"), "utf8"), "m_EditorVersion: 6000.0.66f2\n");
+});
+
+
+test("example Node quality checks install locked dependencies first", async () => {
+  const config = JSON.parse(await readFile(new URL("../orchestrator/worker.config.example.json", import.meta.url), "utf8"));
+  for (const name of ["brainforge-company", "bcc-improvements"])
+    assert.deepEqual(config.projects[name].checks, [["npm", "ci"], ["npm", "test"], ["npm", "run", "build"]]);
+  assert.equal(config.enabled, false);
+  assert.equal(config.projects["sikhi-khoj"].repositories.app.unity.editor, "");
 });
