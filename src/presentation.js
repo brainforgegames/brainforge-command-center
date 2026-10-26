@@ -23,7 +23,8 @@ export function when(value) {
   );
 }
 export function ownerView(task) {
-  const u = task.ownerUpdate || {},
+  const raw = task.ownerUpdate || {},
+    u = { ...raw, ...(raw.brief || {}) },
     research = task.kind === "research";
   return {
     title:
@@ -68,9 +69,9 @@ export function studioSummary(state, now = Date.now(), includeStudio = true) {
             {
               id: "studio-update",
               projectId: "studio",
-              status: "done",
+              status: "update",
               updatedAt: studio.updatedAt,
-              ownerUpdate: studio,
+              ownerUpdate: studio.ownerUpdate || studio,
             },
           ]
         : []),
