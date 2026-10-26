@@ -1,4 +1,8 @@
 import "./style.css";
+import { analyticsPage } from './analytics-page.js';
+import { analyticsView, workerTime } from './analytics.js';
+import "./design.css";
+import { icon } from "./icons.js";
 import { ideaRows, ideaCards, ideasPage, ideaDialog } from "./ideas.js";
 import { validatePreviewImage, safeStoreLink } from "./previews.js";
 import { galleryMarkup } from "./gallery.js";
@@ -23,6 +27,7 @@ let state = initialState(),
   projectFilter = "all",
   statusFilter = "all",
   workView = "all";
+let analyticsPeriod = 'today', analyticsMetric = 'time';
 const root = document.querySelector("#app");
 let allocationDraft = null,
   allocationBusy = false;
@@ -93,7 +98,6 @@ function projectsPage() {
   return `<div class="page-intro"><p>Five focus areas. Progress and next steps live here. Change the balance in <button class="text" data-page="Time split">Time split →</button></p></div><div class="section-title"><div><p class="eyebrow">THE STUDIO PORTFOLIO</p><h2>All projects</h2></div><span class="muted">Select a card to explore its work</span></div>${projects()}`;
 }
 function projects() {
-  const shares = allocationShares(state.projects);
   return `<div class="project-grid">${state.projects
     .map((p, i) => {
       const tasks = recentFirst(
@@ -117,7 +121,7 @@ function projects() {
               : s.issues.length
                 ? "Resolving an issue"
                 : "Planning next steps";
-      return `<article class="project p${i}"><div class="project-top"><span class="monogram">${esc(p.short || p.name.slice(0, 2))}</span>${badge(status, !p.enabled || !p.weight ? "paused" : s.active.length ? "running" : s.issues.length ? "blocked" : "ready")}</div><h3>${esc(p.name)}</h3><p class="project-description">${esc(p.description)}</p>${safeStoreLink(p.storeLink) ? `<a class="store-link" href="${esc(safeStoreLink(p.storeLink))}" target="_blank" rel="noopener noreferrer">View on Google Play</a>` : ""}<div class="project-snapshot"><span class="fact-label">Latest progress</span>${bullets(latest ? ownerView(latest).done : "No progress update recorded yet.")}<span class="fact-label">Coming next</span>${bullets(u?.next || p.nextPlan || "Research ideas and prepare a plan before starting product changes.")}</div><div class="saved-share"><span>Time share</span><strong>${shares[p.id]}%</strong><i style="width:${shares[p.id]}%"></i></div><div class="project-counts"><span><b>${s.open.length}</b> open work items</span><span><b>${s.questions.length}</b> questions for you</span></div><div class="project-footer"><small>${latest ? "Updated " + esc(when(stamp(latest))) : "Awaiting first update"}</small>${p.id === "brainforge-company" ? `<button class="text" data-page="Ideas">Explore ideas</button>` : ""}<button class="text" data-project="${esc(p.id)}">See work →</button></div></article>`;
+      return `<article class="project p${i}"><div class="project-top"><span class="monogram">${esc(p.short || p.name.slice(0, 2))}</span>${badge(status, !p.enabled || !p.weight ? "paused" : s.active.length ? "running" : s.issues.length ? "blocked" : "ready")}</div><h3>${esc(p.name)}</h3><p class="project-description">${esc(p.description)}</p>${safeStoreLink(p.storeLink) ? `<a class="store-link" href="${esc(safeStoreLink(p.storeLink))}" target="_blank" rel="noopener noreferrer">View on Google Play</a>` : ""}<div class="project-snapshot"><span class="fact-label">Latest progress</span>${bullets(latest ? ownerView(latest).done : "No progress update recorded yet.")}<span class="fact-label">Coming next</span>${bullets(u?.next || p.nextPlan || "Research ideas and prepare a plan before starting product changes.")}</div><div class="project-counts"><span><b>${s.open.length}</b> open work items</span><span><b>${s.questions.length}</b> questions for you</span></div><div class="project-footer"><small>${latest ? "Updated " + esc(when(stamp(latest))) : "Awaiting first update"}</small>${p.id === "brainforge-company" ? `<button class="text" data-page="Ideas">Explore ideas</button>` : ""}<button class="text" data-project="${esc(p.id)}">See work →</button></div></article>`;
     })
     .join("")}</div>`;
 }
@@ -129,10 +133,10 @@ function today() {
   const next = [...s.active, ...s.planned, ...s.checking, ...s.issues].filter(t => state.projects.some(p => p.id === t.projectId && p.enabled && p.weight > 0));
   return `<section class="hero"><div><span class="eyebrow">YOUR DAILY STUDIO BRIEF</span><h2>Your studio.<br>A clear next move.</h2><p>What changed, what needs attention, and what happens next.</p></div><div class="live-card"><span class="live-indicator ${esc(w.tone)}"></span><strong>${esc(w.title)}</strong><p>${esc(w.detail)}</p><small>Last check-in · ${esc(when(state.worker.lastSeen))}</small><button class="text" data-page="Workers">See worker activity →</button></div></section>
     <div class="stats">
-      <button class="stat-card" data-work-view="today"><small>Updates today</small><strong>${s.today.length}</strong><span>Changed today · includes drafts</span><b>See all ${s.today.length} updates →</b></button>
-      <button class="stat-card" data-work-view="open"><small>Open work</small><strong>${s.open.length}</strong><span>${s.active.length} underway · ${s.planned.length} planned<br>${s.checking.length} waiting for review · ${s.issues.length} need fixes${s.parked.length ? `<br>${s.parked.length} saved on paused projects` : ""}</span><b>See all ${s.open.length} work items →</b></button>
-      <button class="stat-card attention-stat" data-page="Your help"><small>Questions for you</small><strong>${s.questions.length}</strong><span>${s.questions.length ? "A specific answer or decision is needed" : "Nothing you need to do right now"}</span><b>${s.questions.length ? "See the questions →" : "You’re all caught up →"}</b></button>
-      <button class="stat-card" data-page="Reports"><small>Evening report</small><strong>10 PM</strong><span>Every day · India time</span><b>Read the reports →</b></button>
+      <button class="stat-card" data-work-view="today"><span class="stat-icon" aria-hidden="true">${icon("reports")}</span><small>Updates today</small><strong>${s.today.length}</strong><span>Changed today · includes drafts</span><b>See all ${s.today.length} updates →</b></button>
+      <button class="stat-card" data-work-view="open"><span class="stat-icon" aria-hidden="true">${icon("tasks")}</span><small>Open work</small><strong>${s.open.length}</strong><span>${s.active.length} underway · ${s.planned.length} planned<br>${s.checking.length} waiting for review · ${s.issues.length} need fixes${s.parked.length ? `<br>${s.parked.length} saved on paused projects` : ""}</span><b>See all ${s.open.length} work items →</b></button>
+      <button class="stat-card attention-stat" data-page="Your help"><span class="stat-icon" aria-hidden="true">${icon("help")}</span><small>Questions for you</small><strong>${s.questions.length}</strong><span>${s.questions.length ? "A specific answer or decision is needed" : "Nothing you need to do right now"}</span><b>${s.questions.length ? "See the questions →" : "You’re all caught up →"}</b></button>
+      <button class="stat-card" data-page="Reports"><span class="stat-icon" aria-hidden="true">${icon("clock")}</span><small>Evening report</small><strong>10 PM</strong><span>Every day · India time</span><b>Read the reports →</b></button>
     </div>
     <div class="brief-grid">
       <section class="brief"><span class="step-number">01 · RESULTS</span><h2>What was finished</h2>${briefItems(s.completed,"done","No finished work recorded today yet. Drafts are shown separately.")}<button class="text" data-work-view="today">See today’s activity →</button></section>
@@ -178,6 +182,8 @@ function settings() {
   const w = workerView(state);
   return `<div class="settings-grid"><section class="panel"><h2>Work controls</h2>${badge(w.title, w.tone)}<p>${esc(w.detail)}</p><button id="worker-toggle">${state.settings.workerEnabled ? "Pause work" : "Resume work"}</button><p class="muted">Last check-in · ${esc(when(state.worker.lastSeen))}</p></section><section class="panel"><h2>Plan usage</h2><strong class="usage">${state.worker.quota == null ? "Not available" : esc(state.worker.quota) + "%"}</strong><p>Used in the busiest reported account window. This is shared with your other Codex work.</p><div class="notice">The worker waits when your plan limit is reached. No extra credits are purchased.</div></section><section class="panel"><h2>The daily rhythm</h2><div class="timeline"><div><b>10 PM</b><span>Daily report<small>Results, issues and the next plan</small></span></div><div><b>11 PM</b><span>Rest hour begins<small>Progress is saved</small></span></div><div><b>12 AM</b><span>Work can resume<small>Laptop awake, online and within plan limits</small></span></div></div></section><section class="panel"><h2>How we work</h2><ul><li>Discuss tasks and feedback in chat.</li><li>I handle checks, reviews and merging.</li><li>You publish to the Play Store and App Store.</li><li>No task or plan? Research ideas first.</li><li>Sikhi Khoj website updates are grouped weekly.</li></ul></section></div>`;
 }
+const navIcons = {Today:"home",Projects:"folder",Analytics:"chart","Time split":"clock","Work board":"tasks",Workers:"workers","Your help":"help",Reports:"reports",Screenshots:"image",Ideas:"idea",Settings:"settings"};
+const navIcon = label => icon(navIcons[label]);
 function render() {
   state.projects = priorityProjects(state.projects);
   const gated = mode === "firebase" && (!auth || auth.denied || auth.error),
@@ -185,6 +191,7 @@ function render() {
     nav = [
       ["Today", "◈"],
       ["Projects", "▦"],
+      ["Analytics", "▥"],
       ["Time split", "◷"],
       ["Work board", "☷"],
       ["Workers", "◉"],
@@ -194,7 +201,7 @@ function render() {
       ["Ideas", "◇"],
       ["Settings", "⚙"],
     ];
-  root.innerHTML = `<aside class="${menu ? "open" : ""}"><a class="brand" href="#" data-page="Today"><span>BF</span><div>BRAINFORGE<small>COMMAND CENTER</small></div></a><small class="nav-label">YOUR STUDIO</small><nav aria-label="Main navigation">${nav.map(([label, icon]) => `<button data-page="${label}" class="${page === label ? "active" : ""}" ${page === label ? 'aria-current="page"' : ""}><span>${icon}</span>${label}${label === "Your help" && s.questions.length ? `<b class="nav-count">${s.questions.length}</b>` : ""}</button>`).join("")}</nav><div class="sidebar-foot"><span class="dot"></span> Thoughtful progress<small>Quality over speed. Always.</small></div></aside>${menu ? '<button class="nav-backdrop" id="close-menu" aria-label="Close navigation"></button>' : ""}<div class="workspace"><header><button id="menu" class="menu" aria-label="Toggle navigation" aria-expanded="${menu}">☰</button><span>Studio <b>/ ${esc(page)}</b></span><div>${badge(mode === "demo" ? "Preview" : "Private workspace")}<button id="auth">${mode === "demo" ? "Demo" : auth ? "Sign out" : "Sign in"}</button></div></header><main><div class="page-heading"><div><p class="eyebrow">BRAINFORGE COMMAND CENTER</p><h1 class="${page === "Today" ? "studio-wordmark" : ""}">${page === "Today" ? "Brainforge <span>Games</span><i></i>" : esc(page === "Work board" ? ({today:"Updates today",open:"Open work",all:"All work"}[workView]) : page)}</h1></div><span class="muted">${esc(when(Date.now()))}</span></div>${mode === "demo" ? '<div class="demo-banner">Design preview · Sample data only. Your live workspace is separate.</div>' : ""}${gated ? `<section class="panel sign-in"><span class="monogram">BF</span><h2>Your studio, privately.</h2><p>${esc(auth?.error || "Sign in with your Brainforge admin Google account to see progress and plans.")}</p><button id="login">Sign in with Google</button></section>` : ({ Today: today, Projects: projectsPage, "Time split": timeSplitPage, "Work board": workBoard, Workers: workersPage, "Your help": () => `<div class="page-intro"><p>Only decisions, access or information I actually need from you. Reply in our chat; I’ll keep this page updated.</p></div>${questionCards()}`, Reports: reports, Screenshots: screenshotsPage, Ideas: ideas, Settings: settings }[page] || today)()}</main><footer>Brainforge Games <span>Clear plans. Thoughtful progress.</span></footer></div><div id="toast" role="status"></div>`;
+  root.innerHTML = `<aside class="${menu ? "open" : ""}"><a class="brand" href="#" data-page="Today"><span class="brand-mark">${icon("brand")}</span><div>BCC<small>Brainforge Command Center</small></div></a><small class="nav-label">YOUR STUDIO</small><nav aria-label="Main navigation">${nav.map(([label]) => `<button data-page="${label}" class="${page === label ? "active" : ""}" ${page === label ? 'aria-current="page"' : ""}><span>${navIcon(label)}</span>${label}${label === "Your help" && s.questions.length ? `<b class="nav-count">${s.questions.length}</b>` : ""}</button>`).join("")}</nav><div class="sidebar-foot"><span class="dot"></span> Thoughtful progress<small>Quality over speed. Always.</small></div></aside>${menu ? '<button class="nav-backdrop" id="close-menu" aria-label="Close navigation"></button>' : ""}<div class="workspace"><header><button id="menu" class="menu" aria-label="Toggle navigation" aria-expanded="${menu}">☰</button><span class="workspace-label">${icon("workspace")}<span>Brainforge <b>/ ${esc(page)}</b></span></span><div>${badge(mode === "demo" ? "Preview" : "Private workspace")}<button id="auth">${mode === "demo" ? "Demo" : auth ? "Sign out" : "Sign in"}</button></div></header><main><div class="page-heading"><div><p class="eyebrow">BRAINFORGE COMMAND CENTER</p><h1 class="page-title">${page === "Today" ? "Today" : esc(page === "Work board" ? ({today:"Updates today",open:"Open work",all:"All work"}[workView]) : page)}</h1></div><span class="muted">${esc(when(Date.now()))}</span></div>${mode === "demo" ? '<div class="demo-banner">Design preview · Sample data only. Your live workspace is separate.</div>' : ""}${gated ? `<section class="panel sign-in"><span class="monogram">BF</span><h2>Your studio, privately.</h2><p>${esc(auth?.error || "Sign in with your Brainforge admin Google account to see progress and plans.")}</p><button id="login">Sign in with Google</button></section>` : ({ Today: today, Analytics: () => analyticsPage(state, esc, analyticsPeriod, analyticsMetric), Projects: projectsPage, "Time split": timeSplitPage, "Work board": workBoard, Workers: workersPage, "Your help": () => `<div class="page-intro"><p>Only decisions, access or information I actually need from you. Reply in our chat; I’ll keep this page updated.</p></div>${questionCards()}`, Reports: reports, Screenshots: screenshotsPage, Ideas: ideas, Settings: settings }[page] || today)()}</main><footer>Brainforge Games <span>Clear plans. Thoughtful progress.</span></footer></div><div id="toast" role="status"></div>`;
   if (selectedIdea) {
     const current = ideaRows(state.ideas || []).find(v=>v.id===selectedIdea);
     if (current) root.insertAdjacentHTML("beforeend",ideaDialog(current,esc,ideaAlternate));
@@ -309,6 +316,14 @@ function bind() {
         toast(message);
       }
     });
+  document.querySelector('#analytics-period')?.addEventListener('change', e => { analyticsPeriod = e.target.value; render(); document.querySelector('#analytics-period')?.focus(); });
+  document.querySelector('#analytics-metric')?.addEventListener('change', e => { analyticsMetric = e.target.value; render(); document.querySelector('#analytics-metric')?.focus(); });
+  document.querySelectorAll('[data-analytics-bucket]').forEach(button => button.addEventListener('click', () => {
+    const b = analyticsView(state.analyticsDays, analyticsPeriod).buckets[Number(button.dataset.analyticsBucket)];
+    const start = analyticsMetric === 'completed' ? state.analyticsMeta?.completionsStartedAt : state.analyticsMeta?.startedAt;
+    const available = start && b.start + (analyticsPeriod === 'today' ? 3600000 : 86400000) > start && b.start <= Date.now();
+    document.querySelector('#analytics-value').textContent = `${b.label} IST: ${!available ? 'Unavailable history or future period' : analyticsMetric === 'time' ? workerTime(b.milliseconds) : analyticsMetric === 'completed' ? `${b.completed} verified completed tasks` : b.tokenRuns ? `${b.input.toLocaleString()} input, ${b.output.toLocaleString()} output, ${b.cached.toLocaleString()} cached input; ${b.tokenRuns}/${b.runs} runs covered` : 'Token usage unavailable'}`;
+  }));
   if (page === "Time split") allocationInputs();
   document.querySelectorAll("[data-page]").forEach(
     (el) =>
@@ -409,9 +424,11 @@ void boot(
   (s) => {
     state = s;
     const open = [...document.querySelectorAll("details[open][data-detail-key]")].map((el) => el.dataset.detailKey);
+    const analyticsFocus = page === 'Analytics' && document.activeElement?.dataset.analyticsBucket;
     if (document.activeElement?.matches("select,input,textarea") || document.querySelector("#idea-dialog[open]")) return;
     render();
     document.querySelectorAll("details[data-detail-key]").forEach((el) => { el.open = open.includes(el.dataset.detailKey); });
+    if (/^\d+$/.test(analyticsFocus || '')) document.querySelector(`[data-analytics-bucket="${analyticsFocus}"]`)?.focus({ preventScroll: true });
   },
   (u) => {
     auth = u; selectedIdea=null; ideaAlternate=false; previewImage = null; previewError = ""; previewBusy = false; ++previewRequest;
