@@ -33,6 +33,24 @@ export class Coordinator {
    return task;
   });
  }
+ async recoverBlocked() {
+  return this.db.runTransaction(async tx=>{
+   const [cs,ss,ps,ts]=await Promise.all([tx.get(this.ref),tx.get(this.db.doc('settings/global')),tx.get(this.db.collection('projects')),tx.get(this.db.collection('tasks').where('status','==','blocked'))]);
+   const c=cs.data()||{}, settings=ss.data()||{}, now=this.clock(), projects=ps.docs.map(d=>({...d.data(),id:d.id}));
+   if(!settings.workerEnabled || isPaused(new Date(now)) || (c.cooldownUntil||0)>now) return null;
+   const candidates=ts.docs.map(d=>({...d.data(),id:d.id})).filter(t=>{
+    const p=projects.find(p=>p.id===t.projectId), e=t.evidence?.at(-1), recovery=t.automaticRecovery||{};
+    return t.status==='blocked' && t.approved===true && p?.enabled && p.weight>0 && !t.ownerUpdate?.needsOwner && !c.claims?.[t.id]
+      && !Object.values(c.claims||{}).some(x=>x.target===targetKey(t,this.mappings))
+      && (recovery.attempts||0)<2 && now-(t.updatedAt||0)>=300000
+      && e?.passed===false && ['timeout','missing_dependency','process_access'].includes(e.category);
+   }).sort((a,b)=>(b.priority||0)-(a.priority||0));
+   const t=candidates[0];if(!t)return null;
+   tx.update(this.db.doc('tasks/'+t.id),{status:'queued',automaticRecovery:{attempts:(t.automaticRecovery?.attempts||0)+1,lastAttemptAt:now},updatedAt:now,
+     ownerUpdate:{...t.ownerUpdate,next:'Resume the saved draft and repair the setup issue automatically.',needsOwner:false,question:'',answerHint:''}});
+   return t.id;
+  });
+ }
  async owns(id) { return (await this.state()).claims?.[id]?.token===this.token; }
  async canRun(id) {
   const [c,t,s,p]=await Promise.all([this.state(),this.db.doc('tasks/'+id).get(),this.db.doc('settings/global').get(),this.db.collection('projects').get()]);
