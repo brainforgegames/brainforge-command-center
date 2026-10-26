@@ -157,3 +157,48 @@ Visual idea library validation (26 October 2026): 48 Node tests passed, includin
 - Full in-process suite: 68 passed, one Git subprocess test blocked by `spawnSync git EPERM` (69 total). Normal test runner cannot spawn its test subprocesses (`spawn EPERM`). The configured production build also fails at esbuild process creation with `spawn EPERM`; this is not a successful build.
 - Firestore emulator access/concurrency suite could not start because Node cannot spawn `java -version`; Java 21 is installed and responds when invoked directly. Added private/read-only aggregate access tests and a real emulator transaction test for parallel run retries and distinct completion transitions, included in `npm run test:rules`; these require independent execution outside the sandbox. Syntax checks and `git diff --check` pass.
 - Computer-use browser inventory is empty, so desktop/mobile visual and live keyboard interaction checks remain for the unrestricted runner. No live records/configuration, workers, scheduler, credentials, rules or hosting changed. Nothing committed, pushed, merged, deployed or published. Next: independent configured checks and browser smoke test, then the existing orchestrator release/handoff workflow; do not infer historic metrics or auto-complete drafts.
+
+## 26 October 2026, 19:02 IST ? owner reference design pass
+
+- Inspected all eight actual owner PNGs in Downloads, from 02_58_23 PM through 02_59_04 PM using image viewing.
+- Added a final design stylesheet for black/navy surfaces, blue selection states, restrained borders, consistent spacing, readable type, responsive cards and visible keyboard focus; added decorative SVG line icons and reference-style BCC branding.
+- Kept existing data sources and page actions. Added no sample records, people, percentages, schedules or purchases. Time shares now appear only in Time split; Projects retain priority ordering. Today retains separate paused counts, completed-only finished results and paused-project next-step exclusion. Screenshot handlers are unchanged.
+- Passed JavaScript syntax check and git diff whitespace check. All 18 focused existing tests passed with `node --test --test-isolation=none tests/presentation.test.mjs tests/reading.test.mjs tests/previews.test.mjs tests/allocation.test.mjs tests/ideas.test.mjs`.
+- Default test runner could not spawn workers (`spawn EPERM`). Direct Vite production build and preview server both failed when esbuild tried to spawn (`spawn EPERM`). No browser surfaces were available through browser inventory. Consequently production build and desktop/mobile visual inspection remain unverified; orchestrator must complete those checks in its configured environment.
+- Dependency installation did not finish; interrupted it after dependencies needed to identify the build permission error were present. No dependency manifest or lockfile changes. No deployment, commit, push or PR performed. Source changes are left uncommitted.
+
+## 26 October 2026 - design recovery visual-check attempt
+
+- Preserved the prepared design and inspected all eight actual owner PNGs again with image viewing, including the Projects, Tasks, Workers, Reports, Analytics, Automations and Settings references. No additional product changes were made during recovery.
+- Supervisor reports that npm ci and npm run build completed successfully in this exact worktree and Core57 tests passed on the host. These supersede the earlier dependency/build blocker above; no repeated install or full test cycle was run.
+- Current JavaScript syntax checks for src/main.js and src/icons.js and git diff --check pass.
+- Desktop/mobile visual inspection remains blocked: cua.getState returned no browsers or apps, and an explicit attempt to create an in-app browser tab for the local preview returned "Browser is not available: iab". No rendered viewport was available, so no desktop/mobile layout or overflow pass is claimed.
+- Exact next prerequisite: the orchestrator must provide a browser-enabled review session and inspect the prepared design at desktop and phone widths, checking navigation, cards, text wrapping, horizontal overflow, Time split and screenshot focus/Escape behavior. Correct any observed layout issue before accepting the design.
+- Source and validation changes remain uncommitted. Nothing was pushed, merged, deployed or published. No owner decision is needed; this is a worker tooling prerequisite.
+
+## 26 October 2026, 22:56 IST - recovery browser access evidence
+
+- Viewed all eight actual owner reference PNGs again; preserved the prepared source design without further product edits.
+- Supervisor-provided successful locked install, production build and Core57 host tests remain the build/test evidence; no repeated installation or full test cycle was run.
+- Current src/main.js and src/icons.js syntax checks and git diff --check pass.
+- Browser surface inventory still returns no apps or browsers. Tried the installed Windows computer-use skill as an actionable fallback: sky.list_apps found a running Chrome window titled Brainforge Command Center, but sky.get_window/get_window_state was rejected with "Computer Use was not approved to use Google Chrome". No dashboard screenshot or rendered viewport was obtained.
+- Desktop/mobile visual acceptance remains incomplete. Exact unblock action: run a browser-enabled review of this worktree at desktop and phone widths, inspect each existing page for wrapping/overflow and navigation, confirm Projects and Time split separation and screenshot keyboard behavior, and correct any visible issue. This is tooling access for the worker, not an owner product decision.
+- No product edits, commits, pushes, PRs, deployment or publication in this recovery attempt. Prepared changes remain uncommitted.
+
+## 27 October 2026, 00:12 IST - assigned design recovery
+
+- Re-inspected all eight owner PNGs with image viewing; preserved the prepared design and existing uncommitted source files.
+- Current browser inventory is empty for both apps and browsers. Attempting a local review tab through Chrome returned "Browser is not available: chrome". Desktop/mobile rendered inspection remains incomplete; no visual acceptance is claimed.
+- JavaScript syntax checks for src/main.js and src/icons.js and git diff --check pass. One npm.cmd run build attempt reached installed Vite but was blocked by esbuild spawn EPERM. Supervisor-reported successful host build and Core57 tests remain valid separate evidence; no dependency reinstall or repeated test cycle was performed.
+- Required unblock: provide an enabled browser surface for local desktop/mobile inspection, then check wrapping, overflow, navigation, page separation and screenshot keyboard behavior and fix visible issues. This requires worker tooling access, not an owner decision. Changes remain uncommitted and unpublished.
+
+## 27 October 2026 - supervisor visual review
+- Opened the real local preview in the in-app browser. Inspected Today and Projects on the desktop and Today in a 390px phone frame with sample data clearly labeled.
+- Increased result bullets, project descriptions and navigation text for owner readability. Phone hero and text wrap inside the narrow viewport.
+- Host production build and 57 tests passed before this typography-only adjustment. Full page-by-page interaction acceptance remains pending; this is a prepared design, not a published release.
+
+## 27 October 2026 supervisor release checks
+- Integrated current main design without changing its navigation styling; Analytics has its own chart icon and optional collection details.
+- Host npm test: 69 passed. Production build passed. Firestore emulator integration: 9 passed including private access, deduplication and concurrent writes.
+- Browser smoke checks: Analytics opens; Today, 7-day and 30-day selection and time/token/completed views respond; narrow layout inspected. No historic data invented.
+
