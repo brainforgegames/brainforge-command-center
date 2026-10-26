@@ -202,3 +202,4 @@ Visual idea library validation (26 October 2026): 48 Node tests passed, includin
 - Host npm test: 69 passed. Production build passed. Firestore emulator integration: 9 passed including private access, deduplication and concurrent writes.
 - Browser smoke checks: Analytics opens; Today, 7-day and 30-day selection and time/token/completed views respond; narrow layout inspected. No historic data invented.
 
+- Checked a 390px phone fixture with clearly labelled fictional values; stacked narrow-screen Analytics selectors so date labels remain readable.

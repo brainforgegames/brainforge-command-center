@@ -2299,3 +2299,7 @@ button.text { font-size: 15px; font-weight: 700; line-height: 1.7; }
 @media(max-width:600px){.analytics-summary{grid-template-columns:1fr}.analytics-chart{gap:2px}.analytics-column small{writing-mode:vertical-rl;font-size:12px}.analytics-chart{height:240px}.analytics-project{grid-template-columns:1fr}.analytics-project span{font-size:14px}}
 
 .analytics-chart:focus-visible,.analytics-table:focus-visible{outline:2px solid #d6b279;outline-offset:4px}
+
+@media(max-width:480px){.filter-bar.analytics-filters{display:grid;grid-template-columns:1fr}.filter-bar.analytics-filters label{width:100%}}
+
+
