@@ -107,7 +107,7 @@ async function readState() {
   out.tasks = (
     await db
       .collection("tasks")
-      .where("status", "in", ["queued", "running"])
+      .where("status", "in", ["queued", "running", "blocked", "review"])
       .get()
   ).docs.map((d) => ({
     ...d.data(),
