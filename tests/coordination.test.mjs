@@ -93,3 +93,44 @@ test('automatic recovery respects owner input, paused projects, product failures
  }
  const {db,lane1,add}=setup();add('blocked');Object.assign(db.values.get('tasks/blocked'),{status:'blocked',updatedAt:1,evidence:[{passed:false,category:'timeout'}]});db.values.get('projects/a').enabled=false;assert.equal(await lane1.recoverBlocked(),null);
 });
+
+function continuationTask(s, extra={}) {
+ s.add('draft');
+ Object.assign(s.db.values.get('tasks/draft'), {status:'review',continuation:{id:'finish-ui',approved:true,afterStatus:'review',instruction:'Finish the requested UI changes.'}},extra);
+}
+test('a durable continuation is enqueued once across competing workers and survives a return to review',async()=>{
+ const s=setup();continuationTask(s);
+ const results=await Promise.all([s.lane1.resumeContinuation(),s.lane2.resumeContinuation()]);
+ assert.deepEqual(results.filter(Boolean),['draft']);
+ assert.equal(s.db.values.get('tasks/draft').continuationHistory['finish-ui'].queuedAt,s.now);
+ const running=await s.lane2.claim();assert.equal(running.id,'draft');
+ await s.lane2.finishSlice('draft',1,true);
+ s.db.values.get('tasks/draft').status='review';
+ assert.equal(await s.lane1.resumeContinuation(),null);
+});
+test('continuations never race an active repository including aliases and parked claims',async()=>{
+ const s=setup();s.add('active');await s.lane1.claim();await s.lane1.finishSlice('active',2);
+ s.mappings.b.path='C:/a';continuationTask(s,{projectId:'b'});
+ assert.equal(await s.lane2.resumeContinuation(),null);
+ assert.equal(s.db.values.get('tasks/draft').status,'review');
+});
+test('continuations preserve explicit owner questions only for supervisor-approved independent work',async()=>{
+ const s=setup();continuationTask(s,{ownerUpdate:{needsOwner:true,question:'Confirm the app identifier.',answerHint:'From your account'}});
+ assert.equal(await s.lane1.resumeContinuation(),null);
+ s.db.values.get('tasks/draft').continuation.independentOfOwner=true;
+ assert.equal(await s.lane1.resumeContinuation(),'draft');
+ assert.equal(s.db.values.get('tasks/draft').ownerUpdate.question,'Confirm the app identifier.');
+ assert.equal(s.db.values.get('tasks/draft').ownerUpdate.needsOwner,true);
+});
+test('continuations fail closed for missing approval, mismatched state, blank action, future time and project pause',async()=>{
+ for(const descriptor of [{approved:false},{afterStatus:'blocked'},{instruction:'  '},{notBefore:Number.MAX_SAFE_INTEGER},{id:'bad.id'}]){
+  const s=setup();continuationTask(s);Object.assign(s.db.values.get('tasks/draft').continuation,descriptor);
+  assert.equal(await s.lane1.resumeContinuation(),null);
+ }
+ for(const field of ['weight','enabled']){
+  const s=setup();continuationTask(s);s.db.values.get('projects/a')[field]=field==='weight'?0:false;
+  assert.equal(await s.lane1.resumeContinuation(),null);
+ }
+ const s=setup();continuationTask(s);await s.lane1.cooldown(s.now+1000,'limit');
+ assert.equal(await s.lane1.resumeContinuation(),null);
+});

@@ -51,6 +51,30 @@ export class Coordinator {
    return t.id;
   });
  }
+ // A human/supervisor-authored continuation is a concrete remaining action, not
+ // an inferred retry of a completed draft. Keep the task identity and worktree.
+ async resumeContinuation() {
+  return this.db.runTransaction(async tx=>{
+   const [cs,ss,ps,ts]=await Promise.all([tx.get(this.ref),tx.get(this.db.doc('settings/global')),tx.get(this.db.collection('projects')),tx.get(this.db.collection('tasks').where('status','in',['blocked','review']))]);
+   const c=cs.data()||{}, settings=ss.data()||{}, now=this.clock(), projects=ps.docs.map(d=>({...d.data(),id:d.id}));
+   if(!settings.workerEnabled || isPaused(new Date(now)) || (c.cooldownUntil||0)>now) return null;
+   const candidates=ts.docs.map(d=>({...d.data(),id:d.id})).filter(t=>{
+    const p=projects.find(p=>p.id===t.projectId), next=t.continuation, history=t.continuationHistory||{};
+    return ['blocked','review'].includes(t.status) && t.approved===true && p?.enabled && p.weight>0
+     && (!t.ownerUpdate?.needsOwner || next?.independentOfOwner===true) && !c.claims?.[t.id]
+     && !Object.values(c.claims||{}).some(x=>x.target===targetKey(t,this.mappings))
+     && next?.approved===true && typeof next.id==='string' && /^[a-zA-Z0-9_-]{1,100}$/.test(next.id)
+     && typeof next.instruction==='string' && next.instruction.trim().length>0
+     && next.afterStatus===t.status && Number.isFinite(next.notBefore??0) && (next.notBefore||0)<=now
+     && !history[next.id];
+   }).sort((a,b)=>(b.priority||0)-(a.priority||0));
+   const t=candidates[0]; if(!t)return null;
+   tx.update(this.db.doc('tasks/'+t.id),{status:'queued',updatedAt:now,
+    continuationHistory:{...(t.continuationHistory||{}),[t.continuation.id]:{queuedAt:now,lane:this.lane}},
+    ownerUpdate:{...t.ownerUpdate,next:t.continuation.instruction}});
+   return t.id;
+  });
+ }
  async owns(id) { return (await this.state()).claims?.[id]?.token===this.token; }
  async canRun(id) {
   const [c,t,s,p]=await Promise.all([this.state(),this.db.doc('tasks/'+id).get(),this.db.doc('settings/global').get(),this.db.collection('projects').get()]);
