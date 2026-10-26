@@ -15,6 +15,11 @@ export class Coordinator {
  constructor(db,lane,token,mappings,minutes=20,clock=()=>Date.now()) { Object.assign(this,{db,lane,token,mappings,minutes,clock}); this.ref=db.doc('coordination/runtime'); }
  async state() { return (await this.ref.get()).data() || {}; }
  async claim(resumeId=null, knownIds=[]) {
+  // Promote runnable primary follow-ups before considering parked fallback work.
+  if (!resumeId) {
+   await this.resumeContinuation({primaryOnly:true});
+   await this.recoverBlocked({primaryOnly:true});
+  }
   return this.db.runTransaction(async tx=>{
    const [cs,ss,ps,ts]=await Promise.all([tx.get(this.ref),tx.get(this.db.doc('settings/global')),tx.get(this.db.collection('projects')),tx.get(this.db.collection('tasks').where('status','in',['queued','running','blocked','review']))]);
    const c=cs.data()||{}, settings=ss.data()||{}, projects=ps.docs.map(d=>({...d.data(),id:d.id})), tasks=ts.docs.map(d=>({...d.data(),id:d.id}));
@@ -34,14 +39,14 @@ export class Coordinator {
    return task;
   });
  }
- async recoverBlocked() {
+ async recoverBlocked({primaryOnly=false}={}) {
   return this.db.runTransaction(async tx=>{
    const [cs,ss,ps,ts]=await Promise.all([tx.get(this.ref),tx.get(this.db.doc('settings/global')),tx.get(this.db.collection('projects')),tx.get(this.db.collection('tasks').where('status','==','blocked'))]);
    const c=cs.data()||{}, settings=ss.data()||{}, now=this.clock(), projects=ps.docs.map(d=>({...d.data(),id:d.id}));
    if(!settings.workerEnabled || isPaused(new Date(now)) || (c.cooldownUntil||0)>now) return null;
    const candidates=ts.docs.map(d=>({...d.data(),id:d.id})).filter(t=>{
     const e=t.evidence?.at(-1), recovery=t.automaticRecovery||{};
-    return t.status==='blocked' && t.approved===true && projectAllows(t,projects,settings) && !t.ownerUpdate?.needsOwner && !c.claims?.[t.id]
+    return t.status==='blocked' && t.approved===true && (!primaryOnly || primaryProject(projects.find(p=>p.id===t.projectId))) && projectAllows(t,projects,settings) && !t.ownerUpdate?.needsOwner && !c.claims?.[t.id]
       && !Object.values(c.claims||{}).some(x=>x.target===targetKey(t,this.mappings))
       && (recovery.attempts||0)<2 && now-(t.updatedAt||0)>=300000
       && e?.passed===false && ['timeout','missing_dependency','process_access'].includes(e.category);
@@ -54,14 +59,14 @@ export class Coordinator {
  }
  // A human/supervisor-authored continuation is a concrete remaining action, not
  // an inferred retry of a completed draft. Keep the task identity and worktree.
- async resumeContinuation() {
+ async resumeContinuation({primaryOnly=false}={}) {
   return this.db.runTransaction(async tx=>{
    const [cs,ss,ps,ts]=await Promise.all([tx.get(this.ref),tx.get(this.db.doc('settings/global')),tx.get(this.db.collection('projects')),tx.get(this.db.collection('tasks').where('status','in',['blocked','review']))]);
    const c=cs.data()||{}, settings=ss.data()||{}, now=this.clock(), projects=ps.docs.map(d=>({...d.data(),id:d.id}));
    if(!settings.workerEnabled || isPaused(new Date(now)) || (c.cooldownUntil||0)>now) return null;
    const candidates=ts.docs.map(d=>({...d.data(),id:d.id})).filter(t=>{
     const next=t.continuation, history=t.continuationHistory||{};
-    return ['blocked','review'].includes(t.status) && t.approved===true && projectAllows(t,projects,settings)
+    return ['blocked','review'].includes(t.status) && t.approved===true && (!primaryOnly || primaryProject(projects.find(p=>p.id===t.projectId))) && projectAllows(t,projects,settings)
      && (!t.ownerUpdate?.needsOwner || next?.independentOfOwner===true) && !c.claims?.[t.id]
      && !Object.values(c.claims||{}).some(x=>x.target===targetKey(t,this.mappings))
      && next?.approved===true && typeof next.id==='string' && /^[a-zA-Z0-9_-]{1,100}$/.test(next.id)

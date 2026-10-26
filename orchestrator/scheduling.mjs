@@ -13,10 +13,6 @@ export function projectAllows(task, projects, settings) {
   const project = projects.find(p => p.id === task.projectId);
   return !!project && (primaryProject(project) || fallbackTask(task, settings));
 }
-export function unfinishedImplementation(projects, tasks, settings) {
-  return tasks.some(t => t.approved === true && t.kind !== 'research' &&
-    t.status !== 'done' && projectAllows(t, projects, settings));
-}
 export function selectScheduledTask(projects, tasks, served = {}, settings = {}, allTasks = tasks) {
   const implementation = tasks.filter(t => t.kind !== 'research');
   const primary = selectTask(projects, implementation, served);
@@ -24,7 +20,8 @@ export function selectScheduledTask(projects, tasks, served = {}, settings = {},
   const drivenix = implementation.filter(t => t.projectId === 'drivenix' && fallbackTask(t, settings));
   const fallback = selectTask([{ id: 'drivenix', enabled: true, weight: 1 }], drivenix, served);
   if (fallback) return fallback;
-  if (unfinishedImplementation(projects, allTasks, settings)) return null;
+  // Only runnable, unclaimed implementation takes precedence; blocked or review
+  // items must not idle an independent repository with approved research.
   const research = tasks.filter(t => t.kind === 'research');
   const regular = selectTask(projects, research, served);
   if (regular) return regular;

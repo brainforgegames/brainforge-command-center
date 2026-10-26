@@ -131,13 +131,13 @@ test('fallback cannot steal suspended claims or collide with primary repository 
  db.values.get('projects/a').enabled=false;assert.equal(await lane2.claim(),null);
  assert.ok(await lane1.owns('primary'));
 });
-test('research waits for unfinished implementation including blocked and review drafts',async()=>{
+test('research waits for runnable implementation but not blocked or review drafts',async()=>{
  for(const status of ['queued','running','blocked','review']) {
   const {db,lane1,add}=setup();db.values.get('settings/global').fallbackProjectOrder=['drivenix','brainforge-company'];
   db.values.set('projects/drivenix',{enabled:false,weight:0});db.values.set('projects/brainforge-company',{enabled:false,weight:0});
   add('dx','drivenix');db.values.get('tasks/dx').status=status;
   add('research','brainforge-company');db.values.get('tasks/research').kind='research';
-  const result=await lane1.claim();assert.equal(result?.id||null,status==='queued'?'dx':null);
+  const result=await lane1.claim();assert.equal(result?.id||null,status==='queued'?'dx':'research');
  }
  const {db,lane1,add}=setup();db.values.get('settings/global').fallbackProjectOrder=['brainforge-company'];
  db.values.set('projects/brainforge-company',{enabled:false,weight:0});add('research','brainforge-company');db.values.get('tasks/research').kind='research';
@@ -161,4 +161,22 @@ test('concurrent fallback claims remain unique and revocation parks the saved dr
  const results=await Promise.all([lane1.claim(),lane2.claim()]);assert.equal(results.filter(Boolean).length,1);
  await lane1.finishSlice('dx',2);db.values.get('settings/global').fallbackProjectOrder=[];
  assert.equal(await lane1.canRun('dx'),false);assert.equal(await lane1.claim('dx'),null);assert.ok(await lane1.owns('dx'));
+});
+
+
+test('primary continuations and recoverable setup failures precede queued fallback work',async()=>{
+ for(const continuation of [true,false]) {
+  const {db,lane1,add}=setup();db.values.get('settings/global').fallbackProjectOrder=['drivenix'];
+  db.values.set('projects/drivenix',{enabled:false,weight:0});add('dx','drivenix');add('primary');
+  Object.assign(db.values.get('tasks/primary'),continuation
+   ? {status:'review',continuation:{id:'finish',approved:true,instruction:'Finish the approved change',afterStatus:'review'}}
+   : {status:'blocked',updatedAt:1,evidence:[{passed:false,category:'timeout'}]});
+  assert.equal((await lane1.claim()).id,'primary');
+ }
+});
+
+test('owner-blocked primary work leaves independent approved research runnable',async()=>{
+ const {db,lane1,add}=setup();add('waiting');Object.assign(db.values.get('tasks/waiting'),{status:'blocked',ownerUpdate:{needsOwner:true}});
+ add('research','b');db.values.get('tasks/research').kind='research';
+ assert.equal((await lane1.claim()).id,'research');assert.equal(db.values.get('tasks/waiting').status,'blocked');
 });

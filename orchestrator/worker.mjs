@@ -1,5 +1,5 @@
 import { runHandoffs } from "./handoff.mjs";
-import { selectScheduledTask, unfinishedImplementation as hasUnfinishedImplementation, projectAllows } from "./scheduling.mjs";
+import { selectScheduledTask, projectAllows } from "./scheduling.mjs";
 import { verificationRetry } from "./recovery.mjs";
 import { recordRun, observedUsage, sessionUsage } from "./analytics.mjs";
 import { acquireLaneLock } from "./lane-lock.mjs";
@@ -388,8 +388,7 @@ async function tick() {
     if (continued) { await status("Queued the next approved implementation step"); return true; }
     const recovered = await coordination.recoverBlocked();
     if (recovered) { await status("Queued automatic recovery of a saved draft"); return true; }
-    const unfinishedImplementation = hasUnfinishedImplementation(s.projects,s.tasks,s.settings);
-    if (s.settings.idleResearchEnabled && !unfinishedImplementation) {
+    if (s.settings.idleResearchEnabled) {
       let created = 0;
       const date = istParts().date;
       for (const p of s.projects.filter((p) => projectAllows({projectId:p.id,kind:"research"},s.projects,s.settings))) {
