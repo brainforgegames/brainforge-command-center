@@ -11,6 +11,7 @@ import {
   studioSummary,
   workerView,
   statusLabels,
+  priorityProjects,
   recentFirst,
   stamp,
   when,
@@ -129,7 +130,7 @@ function today() {
   return `<section class="hero"><div><span class="eyebrow">YOUR DAILY STUDIO BRIEF</span><h2>Your studio.<br>A clear next move.</h2><p>What changed, what needs attention, and what happens next.</p></div><div class="live-card"><span class="live-indicator ${esc(w.tone)}"></span><strong>${esc(w.title)}</strong><p>${esc(w.detail)}</p><small>Last check-in · ${esc(when(state.worker.lastSeen))}</small><button class="text" data-page="Workers">See worker activity →</button></div></section>
     <div class="stats">
       <button class="stat-card" data-work-view="today"><small>Updates today</small><strong>${s.today.length}</strong><span>Changed today · includes drafts</span><b>See all ${s.today.length} updates →</b></button>
-      <button class="stat-card" data-work-view="open"><small>Open work</small><strong>${s.open.length}</strong><span>${s.active.length} underway · ${s.planned.length} planned<br>${s.checking.length} being checked · ${s.issues.length} need fixes</span><b>See all ${s.open.length} work items →</b></button>
+      <button class="stat-card" data-work-view="open"><small>Open work</small><strong>${s.open.length}</strong><span>${s.active.length} underway · ${s.planned.length} planned<br>${s.checking.length} waiting for review · ${s.issues.length} need fixes</span><b>See all ${s.open.length} work items →</b></button>
       <button class="stat-card attention-stat" data-page="Your help"><small>Questions for you</small><strong>${s.questions.length}</strong><span>${s.questions.length ? "A specific answer or decision is needed" : "Nothing you need to do right now"}</span><b>${s.questions.length ? "See the questions →" : "You’re all caught up →"}</b></button>
       <button class="stat-card" data-page="Reports"><small>Evening report</small><strong>10 PM</strong><span>Every day · India time</span><b>Read the reports →</b></button>
     </div>
@@ -179,6 +180,7 @@ function settings() {
   return `<div class="settings-grid"><section class="panel"><h2>Work controls</h2>${badge(w.title, w.tone)}<p>${esc(w.detail)}</p><button id="worker-toggle">${state.settings.workerEnabled ? "Pause work" : "Resume work"}</button><p class="muted">Last check-in · ${esc(when(state.worker.lastSeen))}</p></section><section class="panel"><h2>Plan usage</h2><strong class="usage">${state.worker.quota == null ? "Not available" : esc(state.worker.quota) + "%"}</strong><p>Used in the busiest reported account window. This is shared with your other Codex work.</p><div class="notice">The worker waits when your plan limit is reached. No extra credits are purchased.</div></section><section class="panel"><h2>The daily rhythm</h2><div class="timeline"><div><b>10 PM</b><span>Daily report<small>Results, issues and the next plan</small></span></div><div><b>11 PM</b><span>Rest hour begins<small>Progress is saved</small></span></div><div><b>12 AM</b><span>Work can resume<small>Laptop awake, online and within plan limits</small></span></div></div></section><section class="panel"><h2>How we work</h2><ul><li>Discuss tasks and feedback in chat.</li><li>I handle checks, reviews and merging.</li><li>You publish to the Play Store and App Store.</li><li>No task or plan? Research ideas first.</li><li>Sikhi Khoj website updates are grouped weekly.</li></ul></section></div>`;
 }
 function render() {
+  state.projects = priorityProjects(state.projects);
   const gated = mode === "firebase" && (!auth || auth.denied || auth.error),
     s = studioSummary(state),
     nav = [
