@@ -136,3 +136,28 @@ test("owner time split writes are atomic and new project tasks are supported", a
     ),
   );
 });
+
+test('screenshots and image documents are private and client read-only', async () => {
+  await env.withSecurityRulesDisabled(async ctx => {
+    await setDoc(doc(ctx.firestore(), 'previews/capture'), {title:'Lesson preview',capturedAt:1});
+    await setDoc(doc(ctx.firestore(), 'previews/capture/images/main'), {dataUrl:'private-image'});
+  });
+  for (const ctx of [env.unauthenticatedContext(),env.authenticatedContext('stranger')]) {
+    await assertFails(getDoc(doc(ctx.firestore(),'previews/capture')));
+    await assertFails(getDoc(doc(ctx.firestore(),'previews/capture/images/main')));
+  }
+  const db=env.authenticatedContext('owner').firestore();
+  await assertSucceeds(getDoc(doc(db,'previews/capture')));
+  await assertSucceeds(getDoc(doc(db,'previews/capture/images/main')));
+  await assertFails(setDoc(doc(db,'previews/new'),{title:'forged'}));
+  await assertFails(setDoc(doc(db,'previews/capture/images/main'),{dataUrl:'forged'}));
+});
+
+test('idea proposals are admin-readable and client writes are denied',async()=>{
+ await env.withSecurityRulesDisabled(async ctx=>{await setDoc(doc(ctx.firestore(),'ideas/sample'),{name:'Synthetic proposal',updatedAt:1});});
+ for(const ctx of [env.unauthenticatedContext(),env.authenticatedContext('stranger')]){
+  await assertFails(getDoc(doc(ctx.firestore(),'ideas/sample')));await assertFails(getDocs(collection(ctx.firestore(),'ideas')));
+ }
+ const db=env.authenticatedContext('owner').firestore();await assertSucceeds(getDoc(doc(db,'ideas/sample')));
+ await assertFails(setDoc(doc(db,'ideas/sample'),{name:'forged'}));
+});

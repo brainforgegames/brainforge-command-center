@@ -58,10 +58,12 @@ test("offline heartbeat is not presented as active work", () => {
     now = Date.parse("2026-10-24T18:00:00+05:30");
   s.settings.workerEnabled = true;
   s.worker.lastSeen = now - 6 * 60000;
-  s.tasks = [{ status: "running" }];
+  s.tasks = [{ projectId:"sikhi-khoj", status: "running" }];
   assert.match(workerView(s, now).title, /Waiting for laptop/);
   s.worker.lastSeen = now;
   assert.equal(workerView(s, now).title, "Work is moving");
+  s.projects.find(p=>p.id==="sikhi-khoj").weight=0;
+  assert.equal(workerView(s, now).title, "Ready for the next step");
 });
 
 for (const mixed of [false, true]) {

@@ -130,7 +130,7 @@ decision is needed. All task changes remain uncommitted; nothing was pushed,
 merged, released or published.
 Independent runner: a clean dependency install, all 32 tests, and the production build pass. A real minimal source copy imported and compiled successfully with exact Unity 6000.3.26f1, with its editor log retained outside the disposable copy. Immediate cleanup encountered a temporary Windows directory lock; bounded cleanup retries were added. No device tests claimed.
 
-## 2026-10-26 — Earlier context for private research
+## 2026-10-26 â€” Earlier context for private research
 
 - Prompt construction now loads prior research only after a private research task is claimed/prepared, immediately before execution (including resume). Idle ticks, public research and implementation do not read this context.
 - Firestore lookup is restricted to the same project, research kind and review/done statuses, ordered by updatedAt descending and document ID ascending, with at most 12 candidates. The prompt includes at most 3 records and 12,000 characters, with bounded individual excerpts and explicit untrusted-reference boundaries. Only researchBody and its update time enter the reference; task metadata, result summaries and unrelated projects are excluded. Credential-like and email-containing bodies are omitted conservatively.
@@ -140,3 +140,9 @@ Independent runner: a clean dependency install, all 32 tests, and the production
 - Scheduling, pause, quota, report and public review policies are unchanged. No service deployment, publication, push or commit was performed.
 Independent verification on 26 October: clean locked dependency installation, all 36 Node tests and production build pass. Live Firestore index deployment and same-project context lookup are being verified separately; no claim of native/device testing.
 Independent normal runner on 26 October: clean locked dependency installation, all 39 tests and production build pass. Evidence serialization retains only allowlisted exit/state/category values; private outputs and paths are not copied into the new evidence records.
+
+Private screenshot gallery validation (26 October 2026): 45 Node tests passed; production build passed; Firestore emulator access suite passed all 5 tests, including anonymous/non-admin denial and admin read-only access to both metadata and image documents. No actual captures were uploaded by this change. Gallery visual review with real captures remains an integration check. Public assets contain no screenshots. Firebase rules must be deployed with the frontend change.
+
+Two-worker runtime source validation (26 October 2026): 48 Node tests passed, including seven new coordination/ownership/control/lock cases; production build passed; real Firestore emulator concurrency plus existing rules suite passed all 5 tests. Syntax checks for worker/installer and Python launcher passed. No live database, scheduler, config or worker process was changed. Activation requires reviewed migration, preserved legacy checkpoint and a live two-process smoke check. Claims deliberately fail closed after unaccounted crash reservations.
+
+Visual idea library validation (26 October 2026): 48 Node tests passed, including schema bounds, escaping, semantic cards/dialogs and two distinct SVG states per mechanic. Production build passed. All 6 Firestore emulator access tests passed, including admin-only proposal reads and denied client writes. Actual proposal data was not seeded or published. DEV-only samples are synthetic. Browser automation was unavailable (empty browser inventory); desktop/mobile visual review, keyboard focus return and native dialog behaviour remain integration checks. Isolated sample server: http://127.0.0.1:5191/?sample=1.

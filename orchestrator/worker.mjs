@@ -1,3 +1,6 @@
+import { acquireLaneLock } from "./lane-lock.mjs";
+import { randomUUID } from "node:crypto";
+import { Coordinator, transientCapacity, eligible } from "./coordination.mjs";
 import { runVerification, verificationIssue } from "./verification.mjs";
 import {
   readFile,
@@ -42,11 +45,15 @@ import {
   usesPrivateResearch,
 } from "./research.mjs";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."),
-  local = path.join(root, ".local");
+  lane = process.argv.includes("--lane") ? process.argv[process.argv.indexOf("--lane") + 1] : "legacy",
+  local = path.join(root, ".local", "lanes", lane);
+if (!/^(legacy|lane-[12])$/.test(lane)) throw Error("Use lane-1 or lane-2.");
 await mkdir(local, { recursive: true });
 const cfg = JSON.parse(
   await readFile(path.join(root, "worker.config.json"), "utf8"),
 );
+if ((cfg.parallelWorkers === 2 && lane === "legacy") || (lane !== "legacy" && cfg.parallelWorkers !== 2))
+  throw Error("Worker lane mode does not match configuration; finish migration before starting.");
 if (!cfg.firebaseProjectId || cfg.firebaseProjectId.startsWith("YOUR_"))
   throw Error("Configure Firebase before starting the worker.");
 if (
@@ -58,15 +65,7 @@ if (
 const dry = process.argv.includes("--dry-run"),
   once = process.argv.includes("--once");
 const lockPath = path.join(local, "worker.lock");
-let lock;
-try {
-  lock = await open(lockPath, "wx");
-  await lock.writeFile(String(process.pid));
-} catch {
-  throw Error(
-    "Worker lock exists. Verify no worker is running before removing .local/worker.lock.",
-  );
-}
+const lock = await acquireLaneLock(lockPath);
 const cpPath = path.join(local, "checkpoint.json");
 let cp = { served: {}, task: null, nextAttemptAt: 0, lastReportDate: null };
 if (existsSync(cpPath)) cp = JSON.parse(await readFile(cpPath, "utf8"));
@@ -81,7 +80,18 @@ function checkpoint() {
   });
   return writes;
 }
+cp.ownerToken ||= randomUUID();
+await checkpoint();
 const db = database(cfg.firebaseProjectId, cfg.credentialMode);
+const coordination = new Coordinator(db, lane, cp.ownerToken, cfg.projects, cfg.maxRunMinutes);
+let activeClaim = null, activeSliceStarted = 0, runtimeDeadline = Infinity;
+class ControlPause extends Error {}
+async function mustContinue() {
+  if (Date.now() >= runtimeDeadline) throw new ControlPause("Checkpointed before the scheduled process deadline.");
+  if (!cfg.enabled || (activeClaim && !(await coordination.canRun(activeClaim)))) throw new ControlPause("Work checkpointed: pause, priorities, or shared cooldown changed.");
+  return true;
+}
+async function shouldStopWork() { try { await mustContinue(); return isPaused(new Date()); } catch { return true; } }
 async function readState() {
   const out = {
     projects: [],
@@ -104,23 +114,15 @@ async function readState() {
   }));
   return out;
 }
-let quota = null;
+let quota = null, lastStatus = "Starting worker";
+const heartbeat = setInterval(() => { void status(lastStatus).catch(() => {}); },60000);
+heartbeat.unref();
 async function status(value) {
-  await db.doc("worker/status").set(
-    {
-      status: value,
-      ownerQuestion:
-        value === "Blocked: sign in to Codex with ChatGPT"
-          ? "Can you sign in to Codex on this laptop with your ChatGPT account, then let me know in chat?"
-          : null,
-      lastSeen: Date.now(),
-      quota: quota?.usedPercent ?? null,
-      quotaWindows: quota?.windows || [],
-      nextAttemptAt: cp.nextAttemptAt || null,
-    },
-    { merge: true },
-  );
+  lastStatus = value;
+  await coordination.status(value, { taskId: cp.task?.id || null, projectId: cp.task?.projectId || null,
+    quota: quota?.usedPercent ?? null, nextAttemptAt: cp.nextAttemptAt || null });
 }
+
 function command(
   exe,
   args,
@@ -216,6 +218,7 @@ function command(
   });
 }
 async function checked(exe, args, cwd, opts) {
+  await mustContinue();
   if (isPaused(new Date()))
     throw Error("Daily pause started; checkpoint preserved.");
   opts = {
@@ -225,7 +228,9 @@ async function checked(exe, args, cwd, opts) {
       Math.min(opts?.timeout || 60000, nextPause().getTime() - Date.now()),
     ),
   };
+  opts.shouldStop = shouldStopWork;
   const r = await command(exe, args, cwd, opts);
+  if (r.stopped || await shouldStopWork()) throw new ControlPause("Checkpointed during a control change.");
   if (r.code !== 0)
     throw Error(`${exe} ${args[0]} failed: ${r.err.slice(-1200)}`);
   return r.out.trim();
@@ -275,6 +280,9 @@ async function prune() {
 async function tick() {
   const now = new Date(),
     s = await readState();
+  const shared = await coordination.state();
+  cp.served = shared.served || cp.served;
+  cp.nextAttemptAt = Math.max(cp.nextAttemptAt || 0, shared.cooldownUntil || 0);
   if (dry) {
     const task = selectTask(s.projects, s.tasks, cp.served);
     console.log(
@@ -309,6 +317,7 @@ async function tick() {
     quota = await readQuota(cfg.codexExecutable);
     if (quota.blockedUntil) {
       cp.nextAttemptAt = quota.blockedUntil;
+      await coordination.cooldown(cp.nextAttemptAt,"plan-limit");
       await checkpoint();
       await status("Waiting for plan limit reset");
       return;
@@ -321,13 +330,40 @@ async function tick() {
     await status("Blocked: sign in to Codex with ChatGPT");
     return;
   }
+  cp.suspended ||= {};
+  if (cp.task) {
+    const current = s.tasks.find(t=>t.id===cp.task.id);
+    const project = s.projects.find(p=>p.id===current?.projectId);
+    if (current?.status === "running" && (!project?.enabled || project.weight<=0)) {
+      cp.suspended[cp.task.id] = cp.task; cp.task = null; await checkpoint();
+    }
+  }
+  if (!cp.task) {
+    for (const [id,saved] of Object.entries(cp.suspended)) {
+      const candidate = s.tasks.find(t=>t.id===id);
+      if (!candidate || candidate.status !== "running") {
+        if(await coordination.owns(id)) await coordination.finishSlice(id,0,true);
+        delete cp.suspended[id]; continue;
+      }
+      if (eligible(candidate,s.projects,s.settings)) { cp.task=saved;delete cp.suspended[id];break; }
+    }
+    await checkpoint();
+  }
   let task = cp.task ? s.tasks.find((t) => t.id === cp.task.id) : null;
   if (cp.task && (!task || task.status !== "running")) {
+    if (await coordination.owns(cp.task.id)) await coordination.finishSlice(cp.task.id,0,true);
     cp.task = null;
     await checkpoint();
     task = null;
   }
-  task ||= selectTask(s.projects, s.tasks, cp.served);
+  task = await coordination.claim(cp.task?.id || null,Object.keys(cp.suspended));
+  if (task) {
+    activeClaim = task.id; activeSliceStarted = Date.now(); runtimeDeadline = Date.now()+Math.min(50,cfg.maxRunMinutes+25)*60000;
+    cp.task ||= { id:task.id, session:null, work:null, branch:null };
+    cp.task.projectId = task.projectId;
+    await checkpoint();
+  }
+  if (!task && cp.task) { await status("Checkpointed · project parked or another worker owns the target"); return; }
   if (!task) {
     if (s.settings.idleResearchEnabled) {
       let created = 0;
@@ -391,27 +427,20 @@ async function tick() {
     validateProjectTask(task, project);
     ({ work, branch } = await prepare(task, project));
   } catch (e) {
+    if (e instanceof ControlPause) throw e;
     await db.doc("tasks/" + task.id).update({
       status: "blocked",
       blockedReason: e.message,
       updatedAt: Date.now(),
     });
+    cp.task = null;
+    await checkpoint();
     await status("Skipped blocked task");
     return;
   }
-  if (!cp.task) {
-    const claimed = await db.runTransaction(async (tx) => {
-      const ref = db.doc("tasks/" + task.id),
-        d = await tx.get(ref);
-      if (d.data()?.status !== "queued" || d.data()?.approved !== true)
-        return false;
-      tx.update(ref, { status: "running", branch, updatedAt: Date.now() });
-      return true;
-    });
-    if (!claimed) return;
-    cp.task = { id: task.id, session: null, work, branch };
-    await checkpoint();
-  }
+  cp.task = { ...cp.task, id: task.id, work, branch };
+  await db.doc("tasks/" + task.id).update({branch});
+  await checkpoint();
   const runId = Date.now(),
     events = [];
   await status(`Working: ${task.title}`);
@@ -471,11 +500,10 @@ async function tick() {
   );
   let r;
   try {
-    r = await command(cfg.codexExecutable, args, work, {
+    r = cp.task.readyResult ? {code:0,out:"",err:"",stopped:false} : await command(cfg.codexExecutable, args, work, {
       input: prompt,
       timeout: duration,
-      shouldStop: async () =>
-        !(await db.doc("settings/global").get()).data()?.workerEnabled,
+      shouldStop: shouldStopWork,
       onLine: (line) => {
         try {
           const e = JSON.parse(line);
@@ -490,6 +518,7 @@ async function tick() {
   } catch (e) {
     r = { code: 1, out: "", err: e.message, stopped: false };
   }
+  await coordination.finishSlice(task.id, (Date.now()-started)/60000);
   cp.served[task.projectId] =
     (cp.served[task.projectId] || 0) + (Date.now() - started) / 60000;
   const targetKey = `${task.projectId}:${task.target || "app"}`;
@@ -517,9 +546,15 @@ async function tick() {
     return;
   }
   if (r.code !== 0) {
+    if (transientCapacity(JSON.stringify(events) + " " + r.err)) {
+      cp.nextAttemptAt = Date.now() + 5*60000;
+      await coordination.cooldown(cp.nextAttemptAt,"model-capacity");
+      await checkpoint(); await status("Checkpointed · waiting for model availability"); return;
+    }
     const kind = classifyFailure(events, r.err);
     if (kind === "limit") {
       cp.nextAttemptAt = retryAt(events);
+      await coordination.cooldown(cp.nextAttemptAt,"plan-limit");
       await checkpoint();
       await status("Checkpointed · waiting for plan limit reset");
       return;
@@ -533,6 +568,7 @@ async function tick() {
     await checkpoint();
     return;
   }
+  if (cp.task.readyResult) await writeFile(resultPath,JSON.stringify(cp.task.readyResult));
   let result;
   try {
     const resultText = await readFile(resultPath, "utf8");
@@ -571,6 +607,9 @@ async function tick() {
     await checkpoint();
     return;
   }
+  cp.task.readyResult = result;
+  await checkpoint();
+  await mustContinue();
   const evidence = [];
   const checks =
     task.kind === "research"
@@ -583,11 +622,17 @@ async function tick() {
           ],
         ]
       : project.checks;
-  let unity;
+  let unity, unitySlot = false;
   try {
     if (task.kind !== "research" && project.unity) {
       if (isPaused(new Date()) || !(await db.doc("settings/global").get()).data()?.workerEnabled)
         return;
+      while (!(unitySlot = await coordination.unity(task.id))) {
+        await status("Waiting for the shared Unity test slot");
+        await mustContinue();
+        await new Promise(resolve => setTimeout(resolve,15000));
+      }
+      await mustContinue();
       unity = await prepareUnity({
         source: work,
         config: project.unity,
@@ -595,12 +640,13 @@ async function tick() {
         run: (exe, args, cwd, opts) => command(exe, args, cwd, {
           ...opts,
           timeout: Math.max(1, Math.min(opts.timeout, nextPause().getTime() - Date.now())),
-          shouldStop: async () => isPaused(new Date()) || !(await db.doc("settings/global").get()).data()?.workerEnabled,
+          shouldStop: shouldStopWork,
         }),
       });
       evidence.push({ command: "Unity import/compile", passed: true });
     }
     for (const [checkIndex, check] of checks.entries()) {
+      await mustContinue();
       if (
         isPaused(new Date()) ||
         !(await db.doc("settings/global").get()).data()?.workerEnabled
@@ -619,10 +665,11 @@ async function tick() {
           1,
           Math.min(300000, nextPause().getTime() - Date.now()),
         ),
+        shouldStop: shouldStopWork,
       }), checkIndex + 1);
       evidence.push(checkEvidence);
       if (!checkEvidence.passed) {
-        if (isPaused(new Date())) {
+        if (await shouldStopWork()) {
           await status("Checkpointed during quality checks");
           return;
         }
@@ -647,7 +694,9 @@ async function tick() {
     }
   } finally {
     await unity?.dispose();
+    if (unitySlot) await coordination.unity(task.id,true);
   }
+  await mustContinue();
   let pr = null;
   if (publishReview(task, project, cfg.publishPullRequests)) {
     if (isPaused(new Date())) return;
@@ -728,6 +777,7 @@ async function tick() {
       }
     }
   }
+  await mustContinue();
   await db.doc("tasks/" + task.id).update({
     status: "review",
     result: result.summary,
@@ -770,7 +820,8 @@ try {
       await tick();
     } catch (e) {
       console.error(e.message);
-      if (cp.task && !isPaused(new Date())) {
+      const controlled = e instanceof ControlPause || (activeClaim && await shouldStopWork());
+      if (!controlled && cp.task && !isPaused(new Date()) && await coordination.owns(cp.task.id)) {
         try {
           await db.doc("tasks/" + cp.task.id).update({
             status: "blocked",
@@ -783,14 +834,21 @@ try {
         } catch {}
       }
       try {
-        await status("Needs attention: local worker error; inspect local log");
+        await status(controlled ? "Checkpointed · paused or priorities changed" : "Needs attention: local worker error; inspect local log");
       } catch {}
-      if (once) process.exitCode = 1;
+      if (once && !controlled) process.exitCode = 1;
+    } finally {
+      if (activeClaim) {
+        const terminal = !cp.task;
+        await coordination.finishSlice(activeClaim,(Date.now()-activeSliceStarted)/60000,terminal);
+        activeClaim = null;
+      }
     }
     if (once) break;
     await new Promise((r) => setTimeout(r, 60000));
   } while (true);
 } finally {
+  clearInterval(heartbeat);
   await checkpoint();
   await lock.close();
   await unlink(lockPath);

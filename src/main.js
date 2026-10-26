@@ -1,5 +1,8 @@
 import "./style.css";
-import { boot, save, saveAllocations, login, logout, mode } from "./store.js";
+import { ideaRows, ideaCards, ideasPage, ideaDialog } from "./ideas.js";
+import { validatePreviewImage, safeStoreLink } from "./previews.js";
+import { galleryMarkup } from "./gallery.js";
+import { boot, save, saveAllocations, login, logout, mode, loadPreview } from "./store.js";
 import { allocationShares, suggestedAllocation } from "./allocation.js";
 import { initialState, reportVisible, targetName } from "./domain.js";
 import { readableBullets, workRows, noteSections, reportEntry } from "./reading.js";
@@ -77,6 +80,12 @@ function allocationPanel() {
 function timeSplitPage() {
   return `<div class="page-intro"><p>Set your priorities without managing every task.</p></div>${allocationPanel()}<section class="allocation-advice"><span class="eyebrow">MY RECOMMENDATION</span><h2>Keep the products at the center.</h2><p>Try 80% across the three apps and 20% across company and BCC improvements. That keeps internal improvements useful without letting them take over.</p><p><b>Suggested balance:</b> Sikhi Khoj 30% · Drivenix 25% · Reflex Trainer 25% · Company 10% · BCC 10%.</p><small>The preset fills the controls. Nothing changes until you save.</small></section>`;
 }
+let previewFilter = "all", previewImage = null, previewBusy = false, previewError = "", previewRequest = 0;
+function screenshotsPage() { return galleryMarkup(state, esc, names, when, previewFilter, previewImage, previewError, previewBusy); }
+let selectedIdea = null, ideaAlternate = false;
+function ideas() { return ideasPage(state.ideas || [], esc, when, mode === "firebase" && !state.ideasLoaded, state.ideasUnavailable); }
+function ideaStrip() { return ideaRows(state.ideas || []).length ? `<section class="ideas-strip"><div class="section-title"><div><span class="eyebrow">POSSIBILITIES FOR THE STUDIO</span><h2>Ideas to explore</h2></div><button class="text" data-page="Ideas">All ideas</button></div><p class="concept-label">Concept illustrations · not built games</p><div class="ideas-grid">${ideaCards(state.ideas,esc,when,3)}</div></section>` : ""; }
+function closeIdea() { const previous=selectedIdea; selectedIdea=null;ideaAlternate=false;render();document.querySelector(`[data-idea="${previous}"]`)?.focus(); }
 function projectsPage() {
   return `<div class="page-intro"><p>Five focus areas. Progress and next steps live here. Change the balance in <button class="text" data-page="Time split">Time split →</button></p></div><div class="section-title"><div><p class="eyebrow">THE STUDIO PORTFOLIO</p><h2>All projects</h2></div><span class="muted">Select a card to explore its work</span></div>${projects()}`;
 }
@@ -105,7 +114,7 @@ function projects() {
               : s.issues.length
                 ? "Resolving an issue"
                 : "Planning next steps";
-      return `<article class="project p${i}"><div class="project-top"><span class="monogram">${esc(p.short || p.name.slice(0, 2))}</span>${badge(status, !p.enabled || !p.weight ? "paused" : s.active.length ? "running" : s.issues.length ? "blocked" : "ready")}</div><h3>${esc(p.name)}</h3><p class="project-description">${esc(p.description)}</p><div class="project-snapshot"><span class="fact-label">Latest progress</span>${bullets(latest ? ownerView(latest).done : "No progress update recorded yet.")}<span class="fact-label">Coming next</span>${bullets(u?.next || p.nextPlan || "Research ideas and prepare a plan before starting product changes.")}</div><div class="saved-share"><span>Time share</span><strong>${shares[p.id]}%</strong><i style="width:${shares[p.id]}%"></i></div><div class="project-counts"><span><b>${s.open.length}</b> open work items</span><span><b>${s.questions.length}</b> questions for you</span></div><div class="project-footer"><small>${latest ? "Updated " + esc(when(stamp(latest))) : "Awaiting first update"}</small><button class="text" data-project="${esc(p.id)}">See work →</button></div></article>`;
+      return `<article class="project p${i}"><div class="project-top"><span class="monogram">${esc(p.short || p.name.slice(0, 2))}</span>${badge(status, !p.enabled || !p.weight ? "paused" : s.active.length ? "running" : s.issues.length ? "blocked" : "ready")}</div><h3>${esc(p.name)}</h3><p class="project-description">${esc(p.description)}</p>${safeStoreLink(p.storeLink) ? `<a class="store-link" href="${esc(safeStoreLink(p.storeLink))}" target="_blank" rel="noopener noreferrer">View on Google Play</a>` : ""}<div class="project-snapshot"><span class="fact-label">Latest progress</span>${bullets(latest ? ownerView(latest).done : "No progress update recorded yet.")}<span class="fact-label">Coming next</span>${bullets(u?.next || p.nextPlan || "Research ideas and prepare a plan before starting product changes.")}</div><div class="saved-share"><span>Time share</span><strong>${shares[p.id]}%</strong><i style="width:${shares[p.id]}%"></i></div><div class="project-counts"><span><b>${s.open.length}</b> open work items</span><span><b>${s.questions.length}</b> questions for you</span></div><div class="project-footer"><small>${latest ? "Updated " + esc(when(stamp(latest))) : "Awaiting first update"}</small>${p.id === "brainforge-company" ? `<button class="text" data-page="Ideas">Explore ideas</button>` : ""}<button class="text" data-project="${esc(p.id)}">See work →</button></div></article>`;
     })
     .join("")}</div>`;
 }
@@ -115,7 +124,7 @@ function briefItems(rows, field, fallback) {
 function today() {
   const s = studioSummary(state), w = workerView(state);
   const next = [...s.active, ...s.planned, ...s.checking, ...s.issues];
-  return `<section class="hero"><div><span class="eyebrow">YOUR DAILY STUDIO BRIEF</span><h2>Your studio.<br>A clear next move.</h2><p>What changed, what needs attention, and what happens next.</p></div><div class="live-card"><span class="live-indicator ${esc(w.tone)}"></span><strong>${esc(w.title)}</strong><p>${esc(w.detail)}</p><small>Last check-in · ${esc(when(state.worker.lastSeen))}</small></div></section>
+  return `<section class="hero"><div><span class="eyebrow">YOUR DAILY STUDIO BRIEF</span><h2>Your studio.<br>A clear next move.</h2><p>What changed, what needs attention, and what happens next.</p></div><div class="live-card"><span class="live-indicator ${esc(w.tone)}"></span><strong>${esc(w.title)}</strong><p>${esc(w.detail)}</p><small>Last check-in · ${esc(when(state.worker.lastSeen))}</small><button class="text" data-page="Workers">See worker activity →</button></div></section>
     <div class="stats">
       <button class="stat-card" data-work-view="today"><small>Updates today</small><strong>${s.today.length}</strong><span>Changed today · includes drafts</span><b>See all ${s.today.length} updates →</b></button>
       <button class="stat-card" data-work-view="open"><small>Open work</small><strong>${s.open.length}</strong><span>${s.active.length} underway · ${s.planned.length} planned<br>${s.checking.length} being checked · ${s.issues.length} need fixes</span><b>See all ${s.open.length} work items →</b></button>
@@ -129,7 +138,7 @@ function today() {
     </div>
     ${s.readyForReview.length ? `<section class="review-strip"><div><span class="eyebrow">STILL BEING CHECKED</span><h2>${s.readyForReview.length} ${s.readyForReview.length === 1 ? "draft" : "drafts"} updated today</h2><p>Prepared work, not finished or released. I handle the review.</p></div><button class="secondary" data-review-today>See these drafts →</button></section>` : ""}
     <div class="section-title"><div><p class="eyebrow">AT A GLANCE</p><h2>Your projects</h2></div><button class="text" data-page="Projects">Explore projects →</button></div>${projects()}
-    <section class="panel help-panel"><div class="section-title"><div><p class="eyebrow">ONLY WHEN YOU’RE NEEDED</p><h2>Your help</h2></div>${badge(s.questions.length + " questions",s.questions.length ? "blocked" : "ready")}</div>${questionCards()}</section>
+    ${ideaStrip()}<section class="panel help-panel"><div class="section-title"><div><p class="eyebrow">ONLY WHEN YOU’RE NEEDED</p><h2>Your help</h2></div>${badge(s.questions.length + " questions",s.questions.length ? "blocked" : "ready")}</div>${questionCards()}</section>
     <div class="section-title"><div><p class="eyebrow">MOST RECENT FIRST</p><h2>Latest updates</h2></div><button class="text" data-work-view="today">All today’s updates →</button></div><div class="work-grid">${s.today.slice(0,3).map(taskCard).join("") || empty("A fresh start","Today’s updates will appear here.")}</div>`;
 }
 function workBoard() {
@@ -155,6 +164,14 @@ function reports() {
     return `<article class="panel report"><div class="section-title"><div><span class="eyebrow">${i === 0 ? "LATEST REPORT" : "DAILY REPORT"}</span><h2>${esc(r.date)}</h2></div><time>${esc(when(r.createdAt))}</time></div><div class="report-sections">${sections.map((section) => `<section><h3>${esc(section.heading)}</h3>${reportRows(section.items.slice(0,3))}${section.items.length > 3 ? `<details class="more-items" data-detail-key="more:${esc(r.id || r.date)}:${esc(section.heading)}"><summary>Show ${section.items.length-3} more updates</summary>${reportRows(section.items.slice(3))}</details>` : ""}</section>`).join("")}</div><details class="technical" data-detail-key="report:${esc(r.id || r.date)}"><summary>Details · original report & technical notes</summary>${r.ownerSections ? (r.sections || []).map((section) => notes(section.heading, section.items.join("\n"))).join("") : ""}${notes("Supporting record",r.body)}</details></article>`;
   }).join("") || empty("The evening report is on its way","Today shows live progress while you wait for the 10 PM report.")}`;
 }
+function workersPage() {
+  const now=Date.now();
+  return `<div class="page-intro"><p>Two independent workers share your saved priorities and plan allowance. Only one runs Unity checks at a time.</p></div><div class="work-grid">${["lane-1","lane-2"].map((id,i)=>{
+    const w=state.worker.workers?.[id],t=state.tasks.find(t=>t.id===w?.taskId),fresh=w?.lastSeen && now-w.lastSeen<5*60000;
+    const label=!w ? "Not yet checked in" : !fresh ? "No recent check-in" : !state.settings.workerEnabled ? "Paused" : /^Working:/.test(w.status) ? "Working" : /Unity/.test(w.status) ? "Waiting for game checks" : /model availability/.test(w.status) ? "Waiting for the model" : /limit reset/.test(w.status) ? "Waiting for plan reset" : /review/.test(w.status) ? "Work ready for review" : /pause|checkpoint/i.test(w.status) ? "Progress saved" : "Ready for the next task";
+    return `<article class="work-card"><span class="eyebrow">WORKER ${i+1}</span><h2>${esc(label)}</h2>${t ? `<strong>${esc(names(t.projectId))}</strong><h3>${esc(ownerView(t).title)}</h3><span class="fact-label">Next step</span>${bullets(ownerView(t).next)}` : `<p>${!w ? "This worker has not connected yet." : "It will choose eligible work using your saved time split."}</p>`}<time>Last check-in · ${esc(when(w?.lastSeen))}</time></article>`;
+  }).join("")}</div>`;
+}
 function settings() {
   const w = workerView(state);
   return `<div class="settings-grid"><section class="panel"><h2>Work controls</h2>${badge(w.title, w.tone)}<p>${esc(w.detail)}</p><button id="worker-toggle">${state.settings.workerEnabled ? "Pause work" : "Resume work"}</button><p class="muted">Last check-in · ${esc(when(state.worker.lastSeen))}</p></section><section class="panel"><h2>Plan usage</h2><strong class="usage">${state.worker.quota == null ? "Not available" : esc(state.worker.quota) + "%"}</strong><p>Used in the busiest reported account window. This is shared with your other Codex work.</p><div class="notice">The worker waits when your plan limit is reached. No extra credits are purchased.</div></section><section class="panel"><h2>The daily rhythm</h2><div class="timeline"><div><b>10 PM</b><span>Daily report<small>Results, issues and the next plan</small></span></div><div><b>11 PM</b><span>Rest hour begins<small>Progress is saved</small></span></div><div><b>12 AM</b><span>Work can resume<small>Laptop awake, online and within plan limits</small></span></div></div></section><section class="panel"><h2>How we work</h2><ul><li>Discuss tasks and feedback in chat.</li><li>I handle checks, reviews and merging.</li><li>You publish to the Play Store and App Store.</li><li>No task or plan? Research ideas first.</li><li>Sikhi Khoj website updates are grouped weekly.</li></ul></section></div>`;
@@ -167,11 +184,19 @@ function render() {
       ["Projects", "▦"],
       ["Time split", "◷"],
       ["Work board", "☷"],
+      ["Workers", "◉"],
       ["Your help", "?"],
       ["Reports", "▤"],
+      ["Screenshots", "▧"],
+      ["Ideas", "◇"],
       ["Settings", "⚙"],
     ];
-  root.innerHTML = `<aside class="${menu ? "open" : ""}"><a class="brand" href="#" data-page="Today"><span>BF</span><div>BRAINFORGE<small>COMMAND CENTER</small></div></a><small class="nav-label">YOUR STUDIO</small><nav aria-label="Main navigation">${nav.map(([label, icon]) => `<button data-page="${label}" class="${page === label ? "active" : ""}" ${page === label ? 'aria-current="page"' : ""}><span>${icon}</span>${label}${label === "Your help" && s.questions.length ? `<b class="nav-count">${s.questions.length}</b>` : ""}</button>`).join("")}</nav><div class="sidebar-foot"><span class="dot"></span> Thoughtful progress<small>Quality over speed. Always.</small></div></aside>${menu ? '<button class="nav-backdrop" id="close-menu" aria-label="Close navigation"></button>' : ""}<div class="workspace"><header><button id="menu" class="menu" aria-label="Toggle navigation" aria-expanded="${menu}">☰</button><span>Studio <b>/ ${esc(page)}</b></span><div>${badge(mode === "demo" ? "Preview" : "Private workspace")}<button id="auth">${mode === "demo" ? "Demo" : auth ? "Sign out" : "Sign in"}</button></div></header><main><div class="page-heading"><div><p class="eyebrow">BRAINFORGE COMMAND CENTER</p><h1 class="${page === "Today" ? "studio-wordmark" : ""}">${page === "Today" ? "Brainforge <span>Games</span><i></i>" : esc(page === "Work board" ? ({today:"Updates today",open:"Open work",all:"All work"}[workView]) : page)}</h1></div><span class="muted">${esc(when(Date.now()))}</span></div>${mode === "demo" ? '<div class="demo-banner">Design preview · Sample data only. Your live workspace is separate.</div>' : ""}${gated ? `<section class="panel sign-in"><span class="monogram">BF</span><h2>Your studio, privately.</h2><p>${esc(auth?.error || "Sign in with your Brainforge admin Google account to see progress and plans.")}</p><button id="login">Sign in with Google</button></section>` : ({ Today: today, Projects: projectsPage, "Time split": timeSplitPage, "Work board": workBoard, "Your help": () => `<div class="page-intro"><p>Only decisions, access or information I actually need from you. Reply in our chat; I’ll keep this page updated.</p></div>${questionCards()}`, Reports: reports, Settings: settings }[page] || today)()}</main><footer>Brainforge Games <span>Clear plans. Thoughtful progress.</span></footer></div><div id="toast" role="status"></div>`;
+  root.innerHTML = `<aside class="${menu ? "open" : ""}"><a class="brand" href="#" data-page="Today"><span>BF</span><div>BRAINFORGE<small>COMMAND CENTER</small></div></a><small class="nav-label">YOUR STUDIO</small><nav aria-label="Main navigation">${nav.map(([label, icon]) => `<button data-page="${label}" class="${page === label ? "active" : ""}" ${page === label ? 'aria-current="page"' : ""}><span>${icon}</span>${label}${label === "Your help" && s.questions.length ? `<b class="nav-count">${s.questions.length}</b>` : ""}</button>`).join("")}</nav><div class="sidebar-foot"><span class="dot"></span> Thoughtful progress<small>Quality over speed. Always.</small></div></aside>${menu ? '<button class="nav-backdrop" id="close-menu" aria-label="Close navigation"></button>' : ""}<div class="workspace"><header><button id="menu" class="menu" aria-label="Toggle navigation" aria-expanded="${menu}">☰</button><span>Studio <b>/ ${esc(page)}</b></span><div>${badge(mode === "demo" ? "Preview" : "Private workspace")}<button id="auth">${mode === "demo" ? "Demo" : auth ? "Sign out" : "Sign in"}</button></div></header><main><div class="page-heading"><div><p class="eyebrow">BRAINFORGE COMMAND CENTER</p><h1 class="${page === "Today" ? "studio-wordmark" : ""}">${page === "Today" ? "Brainforge <span>Games</span><i></i>" : esc(page === "Work board" ? ({today:"Updates today",open:"Open work",all:"All work"}[workView]) : page)}</h1></div><span class="muted">${esc(when(Date.now()))}</span></div>${mode === "demo" ? '<div class="demo-banner">Design preview · Sample data only. Your live workspace is separate.</div>' : ""}${gated ? `<section class="panel sign-in"><span class="monogram">BF</span><h2>Your studio, privately.</h2><p>${esc(auth?.error || "Sign in with your Brainforge admin Google account to see progress and plans.")}</p><button id="login">Sign in with Google</button></section>` : ({ Today: today, Projects: projectsPage, "Time split": timeSplitPage, "Work board": workBoard, Workers: workersPage, "Your help": () => `<div class="page-intro"><p>Only decisions, access or information I actually need from you. Reply in our chat; I’ll keep this page updated.</p></div>${questionCards()}`, Reports: reports, Screenshots: screenshotsPage, Ideas: ideas, Settings: settings }[page] || today)()}</main><footer>Brainforge Games <span>Clear plans. Thoughtful progress.</span></footer></div><div id="toast" role="status"></div>`;
+  if (selectedIdea) {
+    const current = ideaRows(state.ideas || []).find(v=>v.id===selectedIdea);
+    if (current) root.insertAdjacentHTML("beforeend",ideaDialog(current,esc,ideaAlternate));
+    else selectedIdea = null;
+  }
   bind();
 }
 let toastTimer;
@@ -185,6 +210,26 @@ function toast(text) {
   }, 5000);
 }
 function bind() {
+  document.querySelectorAll("[data-idea]").forEach(el=>el.onclick=()=>{ selectedIdea=el.dataset.idea;ideaAlternate=false;render(); });
+  const dialog=document.querySelector("#idea-dialog");
+  if(dialog) {
+    dialog.showModal();
+    dialog.addEventListener("cancel",e=>{e.preventDefault();closeIdea();});
+    dialog.addEventListener("click",e=>{if(e.target===dialog){const r=dialog.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)closeIdea();}});
+    document.querySelector("#close-idea")?.addEventListener("click",closeIdea);
+    document.querySelector("#idea-try")?.addEventListener("click",()=>{ideaAlternate=!ideaAlternate;render();document.querySelector("#idea-try")?.focus();});
+  }
+
+  document.querySelector("#preview-filter")?.addEventListener("change", e => { previewFilter = e.target.value; render(); });
+  document.querySelector("#close-preview")?.addEventListener("click", () => { previewImage = null; ++previewRequest; render(); });
+  document.querySelectorAll("[data-preview]").forEach(el => el.onclick = async () => {
+    const item = (state.previews || []).find(p => p.id === el.dataset.preview);
+    if (!item) return;
+    const request = ++previewRequest; previewBusy = true; previewImage = null; previewError = ""; render();
+    try { const image = validatePreviewImage(await loadPreview(item.id)); if (request === previewRequest && auth && !auth.denied) previewImage = {...item, dataUrl: image.dataUrl}; }
+    catch { if (request === previewRequest) previewError = "This screenshot could not be opened. Please try again."; }
+    finally { if (request === previewRequest) { previewBusy = false; render(); } }
+  });
   function allocationInputs() {
     const values = Object.values(allocationDraft || {}),
       total = values.reduce((a, b) => a + b, 0),
@@ -358,12 +403,12 @@ void boot(
   (s) => {
     state = s;
     const open = [...document.querySelectorAll("details[open][data-detail-key]")].map((el) => el.dataset.detailKey);
-    if (document.activeElement?.matches("select,input,textarea")) return;
+    if (document.activeElement?.matches("select,input,textarea") || document.querySelector("#idea-dialog[open]")) return;
     render();
     document.querySelectorAll("details[data-detail-key]").forEach((el) => { el.open = open.includes(el.dataset.detailKey); });
   },
   (u) => {
-    auth = u;
+    auth = u; selectedIdea=null; ideaAlternate=false; previewImage = null; previewError = ""; previewBusy = false; ++previewRequest;
     render();
   },
 ).catch((e) => toast(e.message));

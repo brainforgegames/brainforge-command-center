@@ -142,14 +142,17 @@ export function workerView(state, now = Date.now()) {
     };
   if (w.nextAttemptAt > now)
     return {
-      title: "Waiting for usage to reset",
+      title: w.cooldownReason === "model-capacity" ? "Waiting for model availability" : "Waiting for usage to reset",
       detail:
         "Progress is saved. The worker will retry after " +
         when(w.nextAttemptAt) +
         ".",
       tone: "paused",
     };
-  if (state.tasks.some((t) => t.status === "running"))
+  const freshWorkers = Object.values(w.workers || {}).filter(x => now-x.lastSeen < 5*60000);
+  const activeWorkers = freshWorkers.filter(x => /^Working:/.test(x.status));
+  if (activeWorkers.length) return {title: `${activeWorkers.length} ${activeWorkers.length === 1 ? "worker is" : "workers are"} making progress`, detail: "Independent project work, with one shared Unity testing slot.", tone:"running"};
+  if (state.tasks.some((t) => t.status === "running" && state.projects?.some(p => p.id === t.projectId && p.enabled && p.weight > 0)))
     return {
       title: "Work is moving",
       detail: "The worker is carrying out an agreed task.",
