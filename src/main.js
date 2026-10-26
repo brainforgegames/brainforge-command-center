@@ -1,4 +1,5 @@
 import "./style.css";
+import { ideaRows, ideaCards, ideasPage, ideaDialog } from "./ideas.js";
 import { validatePreviewImage, safeStoreLink } from "./previews.js";
 import { galleryMarkup } from "./gallery.js";
 import { boot, save, saveAllocations, login, logout, mode, loadPreview } from "./store.js";
@@ -81,6 +82,10 @@ function timeSplitPage() {
 }
 let previewFilter = "all", previewImage = null, previewBusy = false, previewError = "", previewRequest = 0;
 function screenshotsPage() { return galleryMarkup(state, esc, names, when, previewFilter, previewImage, previewError, previewBusy); }
+let selectedIdea = null, ideaAlternate = false;
+function ideas() { return ideasPage(state.ideas || [], esc, when, mode === "firebase" && !state.ideasLoaded, state.ideasUnavailable); }
+function ideaStrip() { return ideaRows(state.ideas || []).length ? `<section class="ideas-strip"><div class="section-title"><div><span class="eyebrow">POSSIBILITIES FOR THE STUDIO</span><h2>Ideas to explore</h2></div><button class="text" data-page="Ideas">All ideas</button></div><p class="concept-label">Concept illustrations · not built games</p><div class="ideas-grid">${ideaCards(state.ideas,esc,when,3)}</div></section>` : ""; }
+function closeIdea() { const previous=selectedIdea; selectedIdea=null;ideaAlternate=false;render();document.querySelector(`[data-idea="${previous}"]`)?.focus(); }
 function projectsPage() {
   return `<div class="page-intro"><p>Five focus areas. Progress and next steps live here. Change the balance in <button class="text" data-page="Time split">Time split →</button></p></div><div class="section-title"><div><p class="eyebrow">THE STUDIO PORTFOLIO</p><h2>All projects</h2></div><span class="muted">Select a card to explore its work</span></div>${projects()}`;
 }
@@ -109,7 +114,7 @@ function projects() {
               : s.issues.length
                 ? "Resolving an issue"
                 : "Planning next steps";
-      return `<article class="project p${i}"><div class="project-top"><span class="monogram">${esc(p.short || p.name.slice(0, 2))}</span>${badge(status, !p.enabled || !p.weight ? "paused" : s.active.length ? "running" : s.issues.length ? "blocked" : "ready")}</div><h3>${esc(p.name)}</h3><p class="project-description">${esc(p.description)}</p>${safeStoreLink(p.storeLink) ? `<a class="store-link" href="${esc(safeStoreLink(p.storeLink))}" target="_blank" rel="noopener noreferrer">View on Google Play</a>` : ""}<div class="project-snapshot"><span class="fact-label">Latest progress</span>${bullets(latest ? ownerView(latest).done : "No progress update recorded yet.")}<span class="fact-label">Coming next</span>${bullets(u?.next || p.nextPlan || "Research ideas and prepare a plan before starting product changes.")}</div><div class="saved-share"><span>Time share</span><strong>${shares[p.id]}%</strong><i style="width:${shares[p.id]}%"></i></div><div class="project-counts"><span><b>${s.open.length}</b> open work items</span><span><b>${s.questions.length}</b> questions for you</span></div><div class="project-footer"><small>${latest ? "Updated " + esc(when(stamp(latest))) : "Awaiting first update"}</small><button class="text" data-project="${esc(p.id)}">See work →</button></div></article>`;
+      return `<article class="project p${i}"><div class="project-top"><span class="monogram">${esc(p.short || p.name.slice(0, 2))}</span>${badge(status, !p.enabled || !p.weight ? "paused" : s.active.length ? "running" : s.issues.length ? "blocked" : "ready")}</div><h3>${esc(p.name)}</h3><p class="project-description">${esc(p.description)}</p>${safeStoreLink(p.storeLink) ? `<a class="store-link" href="${esc(safeStoreLink(p.storeLink))}" target="_blank" rel="noopener noreferrer">View on Google Play</a>` : ""}<div class="project-snapshot"><span class="fact-label">Latest progress</span>${bullets(latest ? ownerView(latest).done : "No progress update recorded yet.")}<span class="fact-label">Coming next</span>${bullets(u?.next || p.nextPlan || "Research ideas and prepare a plan before starting product changes.")}</div><div class="saved-share"><span>Time share</span><strong>${shares[p.id]}%</strong><i style="width:${shares[p.id]}%"></i></div><div class="project-counts"><span><b>${s.open.length}</b> open work items</span><span><b>${s.questions.length}</b> questions for you</span></div><div class="project-footer"><small>${latest ? "Updated " + esc(when(stamp(latest))) : "Awaiting first update"}</small>${p.id === "brainforge-company" ? `<button class="text" data-page="Ideas">Explore ideas</button>` : ""}<button class="text" data-project="${esc(p.id)}">See work →</button></div></article>`;
     })
     .join("")}</div>`;
 }
@@ -133,7 +138,7 @@ function today() {
     </div>
     ${s.readyForReview.length ? `<section class="review-strip"><div><span class="eyebrow">STILL BEING CHECKED</span><h2>${s.readyForReview.length} ${s.readyForReview.length === 1 ? "draft" : "drafts"} updated today</h2><p>Prepared work, not finished or released. I handle the review.</p></div><button class="secondary" data-review-today>See these drafts →</button></section>` : ""}
     <div class="section-title"><div><p class="eyebrow">AT A GLANCE</p><h2>Your projects</h2></div><button class="text" data-page="Projects">Explore projects →</button></div>${projects()}
-    <section class="panel help-panel"><div class="section-title"><div><p class="eyebrow">ONLY WHEN YOU’RE NEEDED</p><h2>Your help</h2></div>${badge(s.questions.length + " questions",s.questions.length ? "blocked" : "ready")}</div>${questionCards()}</section>
+    ${ideaStrip()}<section class="panel help-panel"><div class="section-title"><div><p class="eyebrow">ONLY WHEN YOU’RE NEEDED</p><h2>Your help</h2></div>${badge(s.questions.length + " questions",s.questions.length ? "blocked" : "ready")}</div>${questionCards()}</section>
     <div class="section-title"><div><p class="eyebrow">MOST RECENT FIRST</p><h2>Latest updates</h2></div><button class="text" data-work-view="today">All today’s updates →</button></div><div class="work-grid">${s.today.slice(0,3).map(taskCard).join("") || empty("A fresh start","Today’s updates will appear here.")}</div>`;
 }
 function workBoard() {
@@ -174,9 +179,15 @@ function render() {
       ["Your help", "?"],
       ["Reports", "▤"],
       ["Screenshots", "▧"],
+      ["Ideas", "◇"],
       ["Settings", "⚙"],
     ];
-  root.innerHTML = `<aside class="${menu ? "open" : ""}"><a class="brand" href="#" data-page="Today"><span>BF</span><div>BRAINFORGE<small>COMMAND CENTER</small></div></a><small class="nav-label">YOUR STUDIO</small><nav aria-label="Main navigation">${nav.map(([label, icon]) => `<button data-page="${label}" class="${page === label ? "active" : ""}" ${page === label ? 'aria-current="page"' : ""}><span>${icon}</span>${label}${label === "Your help" && s.questions.length ? `<b class="nav-count">${s.questions.length}</b>` : ""}</button>`).join("")}</nav><div class="sidebar-foot"><span class="dot"></span> Thoughtful progress<small>Quality over speed. Always.</small></div></aside>${menu ? '<button class="nav-backdrop" id="close-menu" aria-label="Close navigation"></button>' : ""}<div class="workspace"><header><button id="menu" class="menu" aria-label="Toggle navigation" aria-expanded="${menu}">☰</button><span>Studio <b>/ ${esc(page)}</b></span><div>${badge(mode === "demo" ? "Preview" : "Private workspace")}<button id="auth">${mode === "demo" ? "Demo" : auth ? "Sign out" : "Sign in"}</button></div></header><main><div class="page-heading"><div><p class="eyebrow">BRAINFORGE COMMAND CENTER</p><h1 class="${page === "Today" ? "studio-wordmark" : ""}">${page === "Today" ? "Brainforge <span>Games</span><i></i>" : esc(page === "Work board" ? ({today:"Updates today",open:"Open work",all:"All work"}[workView]) : page)}</h1></div><span class="muted">${esc(when(Date.now()))}</span></div>${mode === "demo" ? '<div class="demo-banner">Design preview · Sample data only. Your live workspace is separate.</div>' : ""}${gated ? `<section class="panel sign-in"><span class="monogram">BF</span><h2>Your studio, privately.</h2><p>${esc(auth?.error || "Sign in with your Brainforge admin Google account to see progress and plans.")}</p><button id="login">Sign in with Google</button></section>` : ({ Today: today, Projects: projectsPage, "Time split": timeSplitPage, "Work board": workBoard, "Your help": () => `<div class="page-intro"><p>Only decisions, access or information I actually need from you. Reply in our chat; I’ll keep this page updated.</p></div>${questionCards()}`, Reports: reports, Screenshots: screenshotsPage, Settings: settings }[page] || today)()}</main><footer>Brainforge Games <span>Clear plans. Thoughtful progress.</span></footer></div><div id="toast" role="status"></div>`;
+  root.innerHTML = `<aside class="${menu ? "open" : ""}"><a class="brand" href="#" data-page="Today"><span>BF</span><div>BRAINFORGE<small>COMMAND CENTER</small></div></a><small class="nav-label">YOUR STUDIO</small><nav aria-label="Main navigation">${nav.map(([label, icon]) => `<button data-page="${label}" class="${page === label ? "active" : ""}" ${page === label ? 'aria-current="page"' : ""}><span>${icon}</span>${label}${label === "Your help" && s.questions.length ? `<b class="nav-count">${s.questions.length}</b>` : ""}</button>`).join("")}</nav><div class="sidebar-foot"><span class="dot"></span> Thoughtful progress<small>Quality over speed. Always.</small></div></aside>${menu ? '<button class="nav-backdrop" id="close-menu" aria-label="Close navigation"></button>' : ""}<div class="workspace"><header><button id="menu" class="menu" aria-label="Toggle navigation" aria-expanded="${menu}">☰</button><span>Studio <b>/ ${esc(page)}</b></span><div>${badge(mode === "demo" ? "Preview" : "Private workspace")}<button id="auth">${mode === "demo" ? "Demo" : auth ? "Sign out" : "Sign in"}</button></div></header><main><div class="page-heading"><div><p class="eyebrow">BRAINFORGE COMMAND CENTER</p><h1 class="${page === "Today" ? "studio-wordmark" : ""}">${page === "Today" ? "Brainforge <span>Games</span><i></i>" : esc(page === "Work board" ? ({today:"Updates today",open:"Open work",all:"All work"}[workView]) : page)}</h1></div><span class="muted">${esc(when(Date.now()))}</span></div>${mode === "demo" ? '<div class="demo-banner">Design preview · Sample data only. Your live workspace is separate.</div>' : ""}${gated ? `<section class="panel sign-in"><span class="monogram">BF</span><h2>Your studio, privately.</h2><p>${esc(auth?.error || "Sign in with your Brainforge admin Google account to see progress and plans.")}</p><button id="login">Sign in with Google</button></section>` : ({ Today: today, Projects: projectsPage, "Time split": timeSplitPage, "Work board": workBoard, "Your help": () => `<div class="page-intro"><p>Only decisions, access or information I actually need from you. Reply in our chat; I’ll keep this page updated.</p></div>${questionCards()}`, Reports: reports, Screenshots: screenshotsPage, Ideas: ideas, Settings: settings }[page] || today)()}</main><footer>Brainforge Games <span>Clear plans. Thoughtful progress.</span></footer></div><div id="toast" role="status"></div>`;
+  if (selectedIdea) {
+    const current = ideaRows(state.ideas || []).find(v=>v.id===selectedIdea);
+    if (current) root.insertAdjacentHTML("beforeend",ideaDialog(current,esc,ideaAlternate));
+    else selectedIdea = null;
+  }
   bind();
 }
 let toastTimer;
@@ -190,6 +201,16 @@ function toast(text) {
   }, 5000);
 }
 function bind() {
+  document.querySelectorAll("[data-idea]").forEach(el=>el.onclick=()=>{ selectedIdea=el.dataset.idea;ideaAlternate=false;render(); });
+  const dialog=document.querySelector("#idea-dialog");
+  if(dialog) {
+    dialog.showModal();
+    dialog.addEventListener("cancel",e=>{e.preventDefault();closeIdea();});
+    dialog.addEventListener("click",e=>{if(e.target===dialog){const r=dialog.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)closeIdea();}});
+    document.querySelector("#close-idea")?.addEventListener("click",closeIdea);
+    document.querySelector("#idea-try")?.addEventListener("click",()=>{ideaAlternate=!ideaAlternate;render();document.querySelector("#idea-try")?.focus();});
+  }
+
   document.querySelector("#preview-filter")?.addEventListener("change", e => { previewFilter = e.target.value; render(); });
   document.querySelector("#close-preview")?.addEventListener("click", () => { previewImage = null; ++previewRequest; render(); });
   document.querySelectorAll("[data-preview]").forEach(el => el.onclick = async () => {
@@ -373,12 +394,12 @@ void boot(
   (s) => {
     state = s;
     const open = [...document.querySelectorAll("details[open][data-detail-key]")].map((el) => el.dataset.detailKey);
-    if (document.activeElement?.matches("select,input,textarea")) return;
+    if (document.activeElement?.matches("select,input,textarea") || document.querySelector("#idea-dialog[open]")) return;
     render();
     document.querySelectorAll("details[data-detail-key]").forEach((el) => { el.open = open.includes(el.dataset.detailKey); });
   },
   (u) => {
-    auth = u; previewImage = null; previewError = ""; previewBusy = false; ++previewRequest;
+    auth = u; selectedIdea=null; ideaAlternate=false; previewImage = null; previewError = ""; previewBusy = false; ++previewRequest;
     render();
   },
 ).catch((e) => toast(e.message));

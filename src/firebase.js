@@ -44,9 +44,9 @@ export async function connect(onChange, onAuth) {
     }
     onAuth(user);
     const state = initialState();
-    for (const name of ["projects", "tasks", "reports", "previews"]) {
+    for (const name of ["projects", "tasks", "reports", "previews", "ideas"]) {
       const ref =
-        name === "previews" ? query(collection(db, name), orderBy("capturedAt", "desc"), limit(12)) : name === "reports"
+        name === "ideas" ? query(collection(db, name), orderBy("updatedAt", "desc"), limit(12)) : name === "previews" ? query(collection(db, name), orderBy("capturedAt", "desc"), limit(12)) : name === "reports"
           ? query(collection(db, name), where("expiresAt", ">", Date.now()))
           : collection(db, name);
       subscriptions.push(
@@ -54,9 +54,10 @@ export async function connect(onChange, onAuth) {
           ref,
           (s) => {
             state[name] = s.docs.map((d) => ({ ...d.data(), id: d.id }));
+            if (name === "ideas") { state.ideasLoaded = true; state.ideasUnavailable = false; }
             onChange(structuredClone(state));
           },
-          (e) => onAuth({ error: e.message }),
+          (e) => { if(name === "ideas") { state.ideasLoaded = true; state.ideasUnavailable = true; onChange(structuredClone(state)); } else onAuth({ error: e.message }); },
         ),
       );
     }
