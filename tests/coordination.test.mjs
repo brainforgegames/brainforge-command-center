@@ -134,3 +134,27 @@ test('continuations fail closed for missing approval, mismatched state, blank ac
  const s=setup();continuationTask(s);await s.lane1.cooldown(s.now+1000,'limit');
  assert.equal(await s.lane1.resumeContinuation(),null);
 });
+
+import { runHandoffs } from '../orchestrator/handoff.mjs';
+for (const outcome of ['review','blocked']) test(`scheduled worker immediately claims next useful task after ${outcome}`,async()=>{
+ const {db,lane1,lane2,add}=setup();add('first');add('next');add('other','b');
+ const other=await lane2.claim(); // Reserve a repository, then use the other for this lane.
+ const project=other.projectId==='a'?'b':'a';
+ add('handoff-first',project);add('handoff-next',project);
+ const seen=[];
+ await runHandoffs(async()=>{
+  const task=await lane1.claim();if(!task)return false;
+  seen.push(task.id);
+  db.values.set('tasks/'+task.id,{...db.values.get('tasks/'+task.id),status:outcome});
+  await lane1.finishSlice(task.id,1,true);
+  return true;
+ });
+ assert.ok(seen.includes('handoff-first'));assert.ok(seen.includes('handoff-next'));
+ assert.equal(new Set(seen).size,seen.length);
+ assert.ok(await lane2.owns(other.id));
+});
+test('handoff drain stops for waiting, retry deadline and safety bound',async()=>{
+ let calls=0;assert.equal(await runHandoffs(async()=>{calls++;return false;}),'waiting');assert.equal(calls,1);
+ calls=0;assert.equal(await runHandoffs(async()=>{calls++;return true;},{maxSteps:3}),'bounded');assert.equal(calls,3);
+ calls=0;assert.equal(await runHandoffs(async()=>{calls++;return true;},{clock:()=>20,deadline:10}),'deadline');assert.equal(calls,0);
+});

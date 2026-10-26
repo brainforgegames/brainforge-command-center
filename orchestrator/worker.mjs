@@ -1,3 +1,4 @@
+import { runHandoffs } from "./handoff.mjs";
 import { verificationRetry } from "./recovery.mjs";
 import { acquireLaneLock } from "./lane-lock.mjs";
 import { randomUUID } from "node:crypto";
@@ -367,9 +368,9 @@ async function tick() {
   if (!task && cp.task) { await status("Checkpointed · project parked or another worker owns the target"); return; }
   if (!task) {
     const continued = await coordination.resumeContinuation();
-    if (continued) { await status("Queued the next approved implementation step"); return; }
+    if (continued) { await status("Queued the next approved implementation step"); return true; }
     const recovered = await coordination.recoverBlocked();
-    if (recovered) { await status("Queued automatic recovery of a saved draft"); return; }
+    if (recovered) { await status("Queued automatic recovery of a saved draft"); return true; }
     const unfinishedImplementation = s.tasks.some(t => t.approved && t.kind !== "research" && t.status !== "done" && s.projects.some(p => p.id === t.projectId && p.enabled && p.weight > 0));
     if (s.settings.idleResearchEnabled && !unfinishedImplementation) {
       let created = 0;
@@ -848,8 +849,10 @@ async function tick() {
 }
 try {
   do {
+    await runHandoffs(async () => {
+    let advance = false;
     try {
-      await tick();
+      advance = await tick() === true;
     } catch (e) {
       console.error(e.message);
       const controlled = e instanceof ControlPause || (activeClaim && await shouldStopWork());
@@ -872,10 +875,13 @@ try {
     } finally {
       if (activeClaim) {
         const terminal = !cp.task;
+        advance ||= terminal;
         await coordination.finishSlice(activeClaim,(Date.now()-activeSliceStarted)/60000,terminal);
         activeClaim = null;
       }
     }
+    return advance && !dry && !(cp.nextAttemptAt > Date.now());
+    });
     if (once) break;
     await new Promise((r) => setTimeout(r, 60000));
   } while (true);
