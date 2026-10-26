@@ -93,3 +93,72 @@ test('automatic recovery respects owner input, paused projects, product failures
  }
  const {db,lane1,add}=setup();add('blocked');Object.assign(db.values.get('tasks/blocked'),{status:'blocked',updatedAt:1,evidence:[{passed:false,category:'timeout'}]});db.values.get('projects/a').enabled=false;assert.equal(await lane1.recoverBlocked(),null);
 });
+
+test('explicit fallback runs after safe primary claims and never changes allocations',async()=>{
+ const {db,lane1,lane2,add,mappings}=setup();
+ db.values.get('settings/global').fallbackProjectOrder=['drivenix','brainforge-company'];
+ db.values.set('projects/drivenix',{enabled:false,weight:0});mappings.drivenix={path:'C:/drivenix'};
+ add('primary');add('fallback','drivenix');
+ const [first,second]=await Promise.all([lane1.claim(),lane2.claim()]);
+ assert.equal(first.id,'primary');assert.equal(second.id,'fallback');
+ assert.equal((await lane1.state()).claims.fallback.selectionMode,'owner-fallback');
+ assert.deepEqual(db.values.get('projects/drivenix'),{enabled:false,weight:0});
+ assert.equal(await lane2.canRun('fallback'),true);
+ await lane2.finishSlice('fallback',2);
+ assert.equal((await lane2.claim('fallback')).id,'fallback');
+});
+test('fallback stays opt-in, scoped, approved, and protected by stop controls',async()=>{
+ for(const settings of [{},{fallbackProjectOrder:'drivenix'},{fallbackProjectOrder:['reflex-trainer']}]) {
+  const {db,lane1,add}=setup();db.values.set('settings/global',{workerEnabled:true,...settings});
+  db.values.set('projects/drivenix',{enabled:false,weight:0});add('dx','drivenix');assert.equal(await lane1.claim(),null);
+ }
+ for(const override of [{approved:false},{kind:'research'},{status:'blocked'}]) {
+  const {db,lane1,add}=setup();db.values.get('settings/global').fallbackProjectOrder=['drivenix'];
+  db.values.set('projects/drivenix',{enabled:false,weight:0});add('dx','drivenix');Object.assign(db.values.get('tasks/dx'),override);assert.equal(await lane1.claim(),null);
+ }
+ const {db,lane1,add,now}=setup();db.values.get('settings/global').fallbackProjectOrder=['drivenix'];
+ db.values.set('projects/drivenix',{enabled:false,weight:0});add('dx','drivenix');
+ await lane1.cooldown(now+1,'quota');assert.equal(await lane1.claim(),null);
+ db.values.set('coordination/runtime',{});db.values.get('settings/global').workerEnabled=false;assert.equal(await lane1.claim(),null);
+ db.values.get('settings/global').workerEnabled=true;
+ lane1.clock=()=>Date.parse('2026-10-26T17:45:00Z');assert.equal(await lane1.claim(),null);
+});
+test('fallback cannot steal suspended claims or collide with primary repository aliases',async()=>{
+ const {db,lane1,lane2,add,mappings}=setup();db.values.get('settings/global').fallbackProjectOrder=['drivenix'];
+ db.values.set('projects/drivenix',{enabled:false,weight:0});mappings.drivenix={path:'C:/a'};
+ add('primary');add('fallback','drivenix');await lane1.claim();await lane1.finishSlice('primary',2);
+ assert.equal(await lane2.claim(),null);
+ db.values.get('projects/a').enabled=false;assert.equal(await lane2.claim(),null);
+ assert.ok(await lane1.owns('primary'));
+});
+test('research waits for unfinished implementation including blocked and review drafts',async()=>{
+ for(const status of ['queued','running','blocked','review']) {
+  const {db,lane1,add}=setup();db.values.get('settings/global').fallbackProjectOrder=['drivenix','brainforge-company'];
+  db.values.set('projects/drivenix',{enabled:false,weight:0});db.values.set('projects/brainforge-company',{enabled:false,weight:0});
+  add('dx','drivenix');db.values.get('tasks/dx').status=status;
+  add('research','brainforge-company');db.values.get('tasks/research').kind='research';
+  const result=await lane1.claim();assert.equal(result?.id||null,status==='queued'?'dx':null);
+ }
+ const {db,lane1,add}=setup();db.values.get('settings/global').fallbackProjectOrder=['brainforge-company'];
+ db.values.set('projects/brainforge-company',{enabled:false,weight:0});add('research','brainforge-company');db.values.get('tasks/research').kind='research';
+ assert.equal((await lane1.claim()).id,'research');
+});
+import { runHandoffs } from '../orchestrator/handoff.mjs';
+test('handoffs are bounded and stop on waits or deadlines',async()=>{
+ let count=0;assert.equal(await runHandoffs(async()=>{count++;return true;},{maxSteps:3}), 'bounded');assert.equal(count,3);
+ assert.equal(await runHandoffs(async()=>false),'waiting');
+ assert.equal(await runHandoffs(async()=>{throw Error('must not run');},{deadline:1,clock:()=>1}),'deadline');
+});
+test('approved continuations are queued once across supervisors',async()=>{
+ const {db,lane1,lane2,add}=setup();add('next');Object.assign(db.values.get('tasks/next'),{status:'review',continuation:{id:'next-step',approved:true,instruction:'Finish remaining checks',afterStatus:'review'}});
+ const results=await Promise.all([lane1.resumeContinuation(),lane2.resumeContinuation()]);assert.equal(results.filter(Boolean).length,1);
+ assert.equal(db.values.get('tasks/next').status,'queued');
+});
+
+test('concurrent fallback claims remain unique and revocation parks the saved draft',async()=>{
+ const {db,lane1,lane2,add}=setup();db.values.get('settings/global').fallbackProjectOrder=['drivenix'];
+ db.values.set('projects/drivenix',{enabled:false,weight:0});add('dx','drivenix');
+ const results=await Promise.all([lane1.claim(),lane2.claim()]);assert.equal(results.filter(Boolean).length,1);
+ await lane1.finishSlice('dx',2);db.values.get('settings/global').fallbackProjectOrder=[];
+ assert.equal(await lane1.canRun('dx'),false);assert.equal(await lane1.claim('dx'),null);assert.ok(await lane1.owns('dx'));
+});
