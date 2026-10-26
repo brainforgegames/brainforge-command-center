@@ -2300,5 +2300,6 @@ button.text { font-size: 15px; font-weight: 700; line-height: 1.7; }
 
 .analytics-chart:focus-visible,.analytics-table:focus-visible{outline:2px solid #d6b279;outline-offset:4px}
 
-@media(max-width:480px){.filter-bar:has(#analytics-period){display:grid;grid-template-columns:1fr}.filter-bar:has(#analytics-period) label{width:100%}}
+@media(max-width:480px){.filter-bar.analytics-filters{display:grid;grid-template-columns:1fr}.filter-bar.analytics-filters label{width:100%}}
+
 
