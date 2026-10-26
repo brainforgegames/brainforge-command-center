@@ -80,6 +80,8 @@ function allocationPanel() {
 function timeSplitPage() {
   return `<div class="page-intro"><p>Set your priorities without managing every task.</p></div>${allocationPanel()}<section class="allocation-advice"><span class="eyebrow">MY RECOMMENDATION</span><h2>Keep the products at the center.</h2><p>Try 80% across the three apps and 20% across company and BCC improvements. That keeps internal improvements useful without letting them take over.</p><p><b>Suggested balance:</b> Sikhi Khoj 30% · Drivenix 25% · Reflex Trainer 25% · Company 10% · BCC 10%.</p><small>The preset fills the controls. Nothing changes until you save.</small></section>`;
 }
+let previewOpener = null;
+function closePreview() { previewImage = null; ++previewRequest; render(); document.querySelector(`[data-preview="${previewOpener}"]`)?.focus(); }
 let previewFilter = "all", previewImage = null, previewBusy = false, previewError = "", previewRequest = 0;
 function screenshotsPage() { return galleryMarkup(state, esc, names, when, previewFilter, previewImage, previewError, previewBusy); }
 let selectedIdea = null, ideaAlternate = false;
@@ -220,15 +222,17 @@ function bind() {
     document.querySelector("#idea-try")?.addEventListener("click",()=>{ideaAlternate=!ideaAlternate;render();document.querySelector("#idea-try")?.focus();});
   }
 
+  document.querySelector(".preview-expanded img")?.addEventListener("error", () => { previewImage = null; previewError = "This image could not be displayed. Please try opening it again."; render(); document.querySelector(`[data-preview="${previewOpener}"]`)?.focus(); });
   document.querySelector("#preview-filter")?.addEventListener("change", e => { previewFilter = e.target.value; render(); });
-  document.querySelector("#close-preview")?.addEventListener("click", () => { previewImage = null; ++previewRequest; render(); });
+  document.querySelector("#close-preview")?.addEventListener("click", closePreview);
   document.querySelectorAll("[data-preview]").forEach(el => el.onclick = async () => {
     const item = (state.previews || []).find(p => p.id === el.dataset.preview);
     if (!item) return;
+    previewOpener = item.id;
     const request = ++previewRequest; previewBusy = true; previewImage = null; previewError = ""; render();
     try { const image = validatePreviewImage(await loadPreview(item.id)); if (request === previewRequest && auth && !auth.denied) previewImage = {...item, dataUrl: image.dataUrl}; }
     catch { if (request === previewRequest) previewError = "This screenshot could not be opened. Please try again."; }
-    finally { if (request === previewRequest) { previewBusy = false; render(); } }
+    finally { if (request === previewRequest) { previewBusy = false; render(); document.querySelector("#close-preview")?.focus(); } }
   });
   function allocationInputs() {
     const values = Object.values(allocationDraft || {}),
@@ -392,6 +396,7 @@ function bind() {
   );
 }
 document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && previewImage) { closePreview(); return; }
   if (e.key === "Escape" && menu) {
     menu = false;
     render();
