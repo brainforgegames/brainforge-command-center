@@ -14,6 +14,7 @@ export async function boot(onChange, onAuth) {
       new URLSearchParams(location.search).get("sample") === "1"
     ) {
       data = (await import("./sample.js")).sampleState();
+      data.analyticsLoaded = true;
       callback(snapshot());
       onAuth({ demo: true });
       return;
@@ -28,6 +29,7 @@ export async function boot(onChange, onAuth) {
       ...p,
       ...data.projects.find((old) => old.id === p.id),
     }));
+    data.analyticsLoaded = true;
     callback(snapshot());
     onAuth({ demo: true });
     return;

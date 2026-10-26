@@ -1,7 +1,7 @@
 const pages = {
   today: 'Today', projects: 'Projects', 'time-split': 'Time split',
   work: 'Work board', workers: 'Workers', help: 'Your help',
-  reports: 'Reports', screenshots: 'Screenshots', ideas: 'Ideas', settings: 'Settings',
+  reports: 'Reports', analytics: 'Analytics', screenshots: 'Screenshots', ideas: 'Ideas', settings: 'Settings',
 };
 const project = value => /^[a-z0-9][a-z0-9_-]{0,99}$/.test(value || '') ? value : 'all';
 const choice = (value, values) => values.includes(value) ? value : 'all';

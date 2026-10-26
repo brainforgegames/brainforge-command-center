@@ -3,11 +3,15 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { database } from "./database.mjs";
 import { istParts, makeReport } from "./policy.mjs";
+import { archiveCompletion } from './analytics.mjs';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const config = JSON.parse(
   await readFile(path.join(root, "worker.config.json"), "utf8"),
 );
 const db = database(config.firebaseProjectId, config.credentialMode);
+// Archive explicit verified timestamps before report cleanup; daily buckets never expire.
+const completed = await db.collection('tasks').where('status', '==', 'done').get();
+for (const task of completed.docs) await archiveCompletion(db, { ...task.data(), id: task.id });
 // Independent of the development lock and Codex quota: a long AI run cannot delay reports.
 const expired = await db
   .collection("reports")
