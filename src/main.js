@@ -1,5 +1,7 @@
 import "./style.css";
-import { boot, save, saveAllocations, login, logout, mode } from "./store.js";
+import { validatePreviewImage, safeStoreLink } from "./previews.js";
+import { galleryMarkup } from "./gallery.js";
+import { boot, save, saveAllocations, login, logout, mode, loadPreview } from "./store.js";
 import { allocationShares, suggestedAllocation } from "./allocation.js";
 import { initialState, reportVisible, targetName } from "./domain.js";
 import { readableBullets, workRows, noteSections, reportEntry } from "./reading.js";
@@ -77,6 +79,8 @@ function allocationPanel() {
 function timeSplitPage() {
   return `<div class="page-intro"><p>Set your priorities without managing every task.</p></div>${allocationPanel()}<section class="allocation-advice"><span class="eyebrow">MY RECOMMENDATION</span><h2>Keep the products at the center.</h2><p>Try 80% across the three apps and 20% across company and BCC improvements. That keeps internal improvements useful without letting them take over.</p><p><b>Suggested balance:</b> Sikhi Khoj 30% · Drivenix 25% · Reflex Trainer 25% · Company 10% · BCC 10%.</p><small>The preset fills the controls. Nothing changes until you save.</small></section>`;
 }
+let previewFilter = "all", previewImage = null, previewBusy = false, previewError = "", previewRequest = 0;
+function screenshotsPage() { return galleryMarkup(state, esc, names, when, previewFilter, previewImage, previewError, previewBusy); }
 function projectsPage() {
   return `<div class="page-intro"><p>Five focus areas. Progress and next steps live here. Change the balance in <button class="text" data-page="Time split">Time split →</button></p></div><div class="section-title"><div><p class="eyebrow">THE STUDIO PORTFOLIO</p><h2>All projects</h2></div><span class="muted">Select a card to explore its work</span></div>${projects()}`;
 }
@@ -105,7 +109,7 @@ function projects() {
               : s.issues.length
                 ? "Resolving an issue"
                 : "Planning next steps";
-      return `<article class="project p${i}"><div class="project-top"><span class="monogram">${esc(p.short || p.name.slice(0, 2))}</span>${badge(status, !p.enabled || !p.weight ? "paused" : s.active.length ? "running" : s.issues.length ? "blocked" : "ready")}</div><h3>${esc(p.name)}</h3><p class="project-description">${esc(p.description)}</p><div class="project-snapshot"><span class="fact-label">Latest progress</span>${bullets(latest ? ownerView(latest).done : "No progress update recorded yet.")}<span class="fact-label">Coming next</span>${bullets(u?.next || p.nextPlan || "Research ideas and prepare a plan before starting product changes.")}</div><div class="saved-share"><span>Time share</span><strong>${shares[p.id]}%</strong><i style="width:${shares[p.id]}%"></i></div><div class="project-counts"><span><b>${s.open.length}</b> open work items</span><span><b>${s.questions.length}</b> questions for you</span></div><div class="project-footer"><small>${latest ? "Updated " + esc(when(stamp(latest))) : "Awaiting first update"}</small><button class="text" data-project="${esc(p.id)}">See work →</button></div></article>`;
+      return `<article class="project p${i}"><div class="project-top"><span class="monogram">${esc(p.short || p.name.slice(0, 2))}</span>${badge(status, !p.enabled || !p.weight ? "paused" : s.active.length ? "running" : s.issues.length ? "blocked" : "ready")}</div><h3>${esc(p.name)}</h3><p class="project-description">${esc(p.description)}</p>${safeStoreLink(p.storeLink) ? `<a class="store-link" href="${esc(safeStoreLink(p.storeLink))}" target="_blank" rel="noopener noreferrer">View on Google Play</a>` : ""}<div class="project-snapshot"><span class="fact-label">Latest progress</span>${bullets(latest ? ownerView(latest).done : "No progress update recorded yet.")}<span class="fact-label">Coming next</span>${bullets(u?.next || p.nextPlan || "Research ideas and prepare a plan before starting product changes.")}</div><div class="saved-share"><span>Time share</span><strong>${shares[p.id]}%</strong><i style="width:${shares[p.id]}%"></i></div><div class="project-counts"><span><b>${s.open.length}</b> open work items</span><span><b>${s.questions.length}</b> questions for you</span></div><div class="project-footer"><small>${latest ? "Updated " + esc(when(stamp(latest))) : "Awaiting first update"}</small><button class="text" data-project="${esc(p.id)}">See work →</button></div></article>`;
     })
     .join("")}</div>`;
 }
@@ -169,9 +173,10 @@ function render() {
       ["Work board", "☷"],
       ["Your help", "?"],
       ["Reports", "▤"],
+      ["Screenshots", "▧"],
       ["Settings", "⚙"],
     ];
-  root.innerHTML = `<aside class="${menu ? "open" : ""}"><a class="brand" href="#" data-page="Today"><span>BF</span><div>BRAINFORGE<small>COMMAND CENTER</small></div></a><small class="nav-label">YOUR STUDIO</small><nav aria-label="Main navigation">${nav.map(([label, icon]) => `<button data-page="${label}" class="${page === label ? "active" : ""}" ${page === label ? 'aria-current="page"' : ""}><span>${icon}</span>${label}${label === "Your help" && s.questions.length ? `<b class="nav-count">${s.questions.length}</b>` : ""}</button>`).join("")}</nav><div class="sidebar-foot"><span class="dot"></span> Thoughtful progress<small>Quality over speed. Always.</small></div></aside>${menu ? '<button class="nav-backdrop" id="close-menu" aria-label="Close navigation"></button>' : ""}<div class="workspace"><header><button id="menu" class="menu" aria-label="Toggle navigation" aria-expanded="${menu}">☰</button><span>Studio <b>/ ${esc(page)}</b></span><div>${badge(mode === "demo" ? "Preview" : "Private workspace")}<button id="auth">${mode === "demo" ? "Demo" : auth ? "Sign out" : "Sign in"}</button></div></header><main><div class="page-heading"><div><p class="eyebrow">BRAINFORGE COMMAND CENTER</p><h1 class="${page === "Today" ? "studio-wordmark" : ""}">${page === "Today" ? "Brainforge <span>Games</span><i></i>" : esc(page === "Work board" ? ({today:"Updates today",open:"Open work",all:"All work"}[workView]) : page)}</h1></div><span class="muted">${esc(when(Date.now()))}</span></div>${mode === "demo" ? '<div class="demo-banner">Design preview · Sample data only. Your live workspace is separate.</div>' : ""}${gated ? `<section class="panel sign-in"><span class="monogram">BF</span><h2>Your studio, privately.</h2><p>${esc(auth?.error || "Sign in with your Brainforge admin Google account to see progress and plans.")}</p><button id="login">Sign in with Google</button></section>` : ({ Today: today, Projects: projectsPage, "Time split": timeSplitPage, "Work board": workBoard, "Your help": () => `<div class="page-intro"><p>Only decisions, access or information I actually need from you. Reply in our chat; I’ll keep this page updated.</p></div>${questionCards()}`, Reports: reports, Settings: settings }[page] || today)()}</main><footer>Brainforge Games <span>Clear plans. Thoughtful progress.</span></footer></div><div id="toast" role="status"></div>`;
+  root.innerHTML = `<aside class="${menu ? "open" : ""}"><a class="brand" href="#" data-page="Today"><span>BF</span><div>BRAINFORGE<small>COMMAND CENTER</small></div></a><small class="nav-label">YOUR STUDIO</small><nav aria-label="Main navigation">${nav.map(([label, icon]) => `<button data-page="${label}" class="${page === label ? "active" : ""}" ${page === label ? 'aria-current="page"' : ""}><span>${icon}</span>${label}${label === "Your help" && s.questions.length ? `<b class="nav-count">${s.questions.length}</b>` : ""}</button>`).join("")}</nav><div class="sidebar-foot"><span class="dot"></span> Thoughtful progress<small>Quality over speed. Always.</small></div></aside>${menu ? '<button class="nav-backdrop" id="close-menu" aria-label="Close navigation"></button>' : ""}<div class="workspace"><header><button id="menu" class="menu" aria-label="Toggle navigation" aria-expanded="${menu}">☰</button><span>Studio <b>/ ${esc(page)}</b></span><div>${badge(mode === "demo" ? "Preview" : "Private workspace")}<button id="auth">${mode === "demo" ? "Demo" : auth ? "Sign out" : "Sign in"}</button></div></header><main><div class="page-heading"><div><p class="eyebrow">BRAINFORGE COMMAND CENTER</p><h1 class="${page === "Today" ? "studio-wordmark" : ""}">${page === "Today" ? "Brainforge <span>Games</span><i></i>" : esc(page === "Work board" ? ({today:"Updates today",open:"Open work",all:"All work"}[workView]) : page)}</h1></div><span class="muted">${esc(when(Date.now()))}</span></div>${mode === "demo" ? '<div class="demo-banner">Design preview · Sample data only. Your live workspace is separate.</div>' : ""}${gated ? `<section class="panel sign-in"><span class="monogram">BF</span><h2>Your studio, privately.</h2><p>${esc(auth?.error || "Sign in with your Brainforge admin Google account to see progress and plans.")}</p><button id="login">Sign in with Google</button></section>` : ({ Today: today, Projects: projectsPage, "Time split": timeSplitPage, "Work board": workBoard, "Your help": () => `<div class="page-intro"><p>Only decisions, access or information I actually need from you. Reply in our chat; I’ll keep this page updated.</p></div>${questionCards()}`, Reports: reports, Screenshots: screenshotsPage, Settings: settings }[page] || today)()}</main><footer>Brainforge Games <span>Clear plans. Thoughtful progress.</span></footer></div><div id="toast" role="status"></div>`;
   bind();
 }
 let toastTimer;
@@ -185,6 +190,16 @@ function toast(text) {
   }, 5000);
 }
 function bind() {
+  document.querySelector("#preview-filter")?.addEventListener("change", e => { previewFilter = e.target.value; render(); });
+  document.querySelector("#close-preview")?.addEventListener("click", () => { previewImage = null; ++previewRequest; render(); });
+  document.querySelectorAll("[data-preview]").forEach(el => el.onclick = async () => {
+    const item = (state.previews || []).find(p => p.id === el.dataset.preview);
+    if (!item) return;
+    const request = ++previewRequest; previewBusy = true; previewImage = null; previewError = ""; render();
+    try { const image = validatePreviewImage(await loadPreview(item.id)); if (request === previewRequest && auth && !auth.denied) previewImage = {...item, dataUrl: image.dataUrl}; }
+    catch { if (request === previewRequest) previewError = "This screenshot could not be opened. Please try again."; }
+    finally { if (request === previewRequest) { previewBusy = false; render(); } }
+  });
   function allocationInputs() {
     const values = Object.values(allocationDraft || {}),
       total = values.reduce((a, b) => a + b, 0),
@@ -363,7 +378,7 @@ void boot(
     document.querySelectorAll("details[data-detail-key]").forEach((el) => { el.open = open.includes(el.dataset.detailKey); });
   },
   (u) => {
-    auth = u;
+    auth = u; previewImage = null; previewError = ""; previewBusy = false; ++previewRequest;
     render();
   },
 ).catch((e) => toast(e.message));

@@ -19,6 +19,9 @@ service cloud.firestore {
    allow read: if admin();
    allow update: if admin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['instructions','workerEnabled']) && request.resource.data.instructions is string && request.resource.data.instructions.size() > 0 && request.resource.data.instructions.size() <= 12000 && request.resource.data.workerEnabled is bool;
   }
+  match /previews/{id} { allow read: if admin(); allow write: if false;
+   match /images/{imageId} { allow read: if admin(); allow write: if false; }
+  }
   match /reports/{id} { allow read: if admin(); }
   match /worker/status { allow read: if admin(); }
   match /{document=**} { allow read, write: if false; }

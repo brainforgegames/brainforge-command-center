@@ -62,3 +62,5 @@ export async function saveAllocations(values) {
   callback(snapshot());
 }
 export const logout = () => remote?.logout();
+
+export async function loadPreview(id) { if (!remote) throw Error("Sample preview: no real screenshots stored here."); return remote.loadPreview(id); }

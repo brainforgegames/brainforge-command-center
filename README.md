@@ -126,3 +126,11 @@ the disposable source, on success and failure. Copy roots inside source or
 overlapping log storage, including filesystem aliases, are rejected. No global
 Git or registry setting changes. Keep real-project Unity configuration disabled
 until the exact installed editor has successfully validated that project.
+
+### Private app screenshots
+
+The Screenshots menu reads the newest 12 capture records from private Firestore. Images are fetched only when opened, from `previews/{id}/images/main`; there are no public image URLs or Cloud Storage dependency. Deploy `firestore.rules` before using it. Both documents are admin-readable and client writes are denied. PNG/JPEG data is limited to 500 KB per capture. This is a small progress gallery, not a full-resolution archive.
+
+Inspect each real capture before ingestion. Crop unrelated windows and remove credentials or personal data. Keep the image and JSON manifest outside this public repository. No sample images are shipped. Capture manifests contain `file`, `projectId`, `title`, `caption`, `source` (`unity-preview` or `device`), `origin` (e.g. isolated editor version and preview scene), `capturedAt` (epoch milliseconds within seven days), and `reviewedSafe:true`. The explicit review acknowledgement is a human/agent assertion, not automatic secret detection. Screenshots show appearance, not proof that gameplay was tested.
+
+Run `node scripts/upload-preview.mjs C:/private/capture.json` with `BCC_FIREBASE_PROJECT_ID` set and existing Firebase CLI authentication (or `BCC_CREDENTIAL_MODE=adc`). The helper atomically saves metadata and image without printing either image or credentials. It rejects unsupported/oversized files and missing capture provenance. Do not add manifests or images to source control. An optional project `storeLink` accepts only the exact Google Play app-listing URL format; the link is informational and does not claim store verification.

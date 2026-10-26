@@ -2241,3 +2241,12 @@ button.text { font-size: 15px; font-weight: 700; line-height: 1.7; }
     font-size: 14px;
   }
 }
+
+.preview-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr)); gap:24px; }
+.preview-card { display:flex; flex-direction:column; align-items:flex-start; gap:14px; }
+.preview-card h2,.preview-card p { margin:0; }
+.preview-card small { overflow-wrap:anywhere; }
+.preview-card button { margin-top:auto; }
+.preview-expanded { margin-bottom:28px; }
+.preview-expanded img { display:block; max-width:100%; max-height:80vh; object-fit:contain; margin:20px auto; background:#101214; border-radius:12px; }
+.store-link { display:inline-block; margin-bottom:18px; font-weight:650; }
