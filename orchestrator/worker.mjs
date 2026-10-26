@@ -1,3 +1,4 @@
+import { runVerification, verificationIssue } from "./verification.mjs";
 import {
   readFile,
   writeFile,
@@ -164,8 +165,10 @@ function command(
     let out = "",
       err = "",
       buffer = "",
-      stopped = false;
+      stopped = false,
+      timedOut = false;
     const timer = setTimeout(() => {
+      timedOut = true;
       stopped = true;
       kill();
     }, timeout);
@@ -207,7 +210,7 @@ function command(
       clearTimeout(timer);
       clearInterval(monitor);
       if (buffer) onLine?.(buffer);
-      resolve({ code, out, err, stopped });
+      resolve({ code, out, err, stopped, timedOut });
     });
     child.stdin.end(input || "");
   });
@@ -595,9 +598,9 @@ async function tick() {
           shouldStop: async () => isPaused(new Date()) || !(await db.doc("settings/global").get()).data()?.workerEnabled,
         }),
       });
-      evidence.push({ command: `Unity ${unity.version} import/compile`, passed: true, log: unity.log });
+      evidence.push({ command: "Unity import/compile", passed: true });
     }
-    for (const check of checks) {
+    for (const [checkIndex, check] of checks.entries()) {
       if (
         isPaused(new Date()) ||
         !(await db.doc("settings/global").get()).data()?.workerEnabled
@@ -611,21 +614,24 @@ async function tick() {
         check.some((x) => typeof x !== "string")
       )
         throw Error("Each quality check must be a command argument array.");
-      const c = await command(check[0], check.slice(1), unity?.work || work, {
+      const checkEvidence = await runVerification(() => command(check[0], check.slice(1), unity?.work || work, {
         timeout: Math.max(
           1,
           Math.min(300000, nextPause().getTime() - Date.now()),
         ),
-      });
-      evidence.push({ command: check.join(" "), passed: c.code === 0 });
-      if (c.code !== 0) {
+      }), checkIndex + 1);
+      evidence.push(checkEvidence);
+      if (!checkEvidence.passed) {
+        if (isPaused(new Date())) {
+          await status("Checkpointed during quality checks");
+          return;
+        }
         await db.doc("tasks/" + task.id).update({
           status: "blocked",
-          blockedReason: "Quality check failed: " + check.join(" "),
+          blockedReason: `${checkEvidence.command}: ${verificationIssue(checkEvidence)}`,
           ownerUpdate: {
             ...result.ownerUpdate,
-            issue:
-              "The result did not pass a required check. I need to fix it before it is ready.",
+            issue: verificationIssue(checkEvidence),
             next: "Inspect the failed check, correct the problem and run the checks again.",
             needsOwner: false,
             question: "",
