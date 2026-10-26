@@ -6,6 +6,10 @@ export const statusLabels = {
   blocked: "Issue to resolve",
   done: "Completed",
 };
+export const priorityProjects = (projects) => [...projects].sort((a,b) => {
+  const active = p => p.enabled && Number(p.weight) > 0;
+  return Number(active(b))-Number(active(a)) || Number(b.weight||0)-Number(a.weight||0) || String(a.name||a.id).localeCompare(String(b.name||b.id));
+});
 export const stamp = (t) => Number(t.updatedAt || t.createdAt || 0);
 export const recentFirst = (tasks) =>
   [...tasks].sort((a, b) => stamp(b) - stamp(a));
@@ -108,7 +112,8 @@ export function studioSummary(state, now = Date.now(), includeStudio = true) {
             ]
           : [],
       ),
-    active: tasks.filter((t) => t.status === "running"),
+    active: tasks.filter((t) => t.status === "running" && state.projects.some(p => p.id === t.projectId && p.enabled && p.weight > 0)),
+    parked: tasks.filter((t) => t.status === "running" && !state.projects.some(p => p.id === t.projectId && p.enabled && p.weight > 0)),
     planned: tasks.filter((t) => t.status === "queued"),
   };
 }

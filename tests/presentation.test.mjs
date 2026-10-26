@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  priorityProjects,
   ownerView,
   studioSummary,
   workerView,
@@ -92,3 +93,14 @@ for (const mixed of [false, true]) {
     assert.match(report.sections.find((s) => s.heading === "Your help").items[0], /Nothing needed/);
   });
 }
+
+test("project lists prioritize enabled shares and place parked projects last without mutating input", () => {
+ const projects=[{id:'paused',weight:95,enabled:false},{id:'bcc',weight:10,enabled:true},{id:'sikhi',weight:90,enabled:true},{id:'zero',weight:0,enabled:true}];
+ assert.deepEqual(priorityProjects(projects).map(p=>p.id),['sikhi','bcc','paused','zero']);
+ assert.equal(projects[0].id,'paused');
+});
+
+test("saved running work on parked projects is not counted as underway", () => {
+ const s=initialState();s.projects=[{id:'active',enabled:true,weight:90},{id:'parked',enabled:false,weight:0}];s.tasks=[{id:'a',projectId:'active',status:'running'},{id:'p',projectId:'parked',status:'running'}];
+ const v=studioSummary(s);assert.equal(v.active.length,1);assert.equal(v.parked.length,1);assert.equal(v.open.length,2);
+});
