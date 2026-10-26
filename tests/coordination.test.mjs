@@ -82,3 +82,14 @@ test('a parked checkpoint can remain owned while its lane runs another repositor
  assert.equal(await lane2.claim(),null);
  assert.equal((await lane1.claim('parked')).id,'parked');
 });
+
+test('two supervisors requeue one setup failure atomically without racing active work',async()=>{
+ const {db,lane1,lane2,add}=setup();add('retry');Object.assign(db.values.get('tasks/retry'),{status:'blocked',updatedAt:1,evidence:[{passed:false,category:'timeout'}]});
+ const results=await Promise.all([lane1.recoverBlocked(),lane2.recoverBlocked()]);assert.equal(results.filter(Boolean).length,1);assert.equal(db.values.get('tasks/retry').automaticRecovery.attempts,1);
+});
+test('automatic recovery respects owner input, paused projects, product failures and retry bounds',async()=>{
+ for(const override of [{ownerUpdate:{needsOwner:true}},{automaticRecovery:{attempts:2}},{evidence:[{passed:false,category:'product_assertion'}]},{approved:false}]){
+ const {db,lane1,add}=setup();add('blocked');Object.assign(db.values.get('tasks/blocked'),{status:'blocked',updatedAt:1,evidence:[{passed:false,category:'timeout'}]},override);assert.equal(await lane1.recoverBlocked(),null);
+ }
+ const {db,lane1,add}=setup();add('blocked');Object.assign(db.values.get('tasks/blocked'),{status:'blocked',updatedAt:1,evidence:[{passed:false,category:'timeout'}]});db.values.get('projects/a').enabled=false;assert.equal(await lane1.recoverBlocked(),null);
+});

@@ -366,7 +366,10 @@ async function tick() {
   }
   if (!task && cp.task) { await status("Checkpointed · project parked or another worker owns the target"); return; }
   if (!task) {
-    if (s.settings.idleResearchEnabled) {
+    const recovered = await coordination.recoverBlocked();
+    if (recovered) { await status("Queued automatic recovery of a saved draft"); return; }
+    const unfinishedImplementation = s.tasks.some(t => t.approved && t.kind !== "research" && t.status !== "done" && s.projects.some(p => p.id === t.projectId && p.enabled && p.weight > 0));
+    if (s.settings.idleResearchEnabled && !unfinishedImplementation) {
       let created = 0;
       const date = istParts().date;
       for (const p of s.projects.filter((p) => p.enabled && p.weight > 0)) {
