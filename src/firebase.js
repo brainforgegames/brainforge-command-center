@@ -15,9 +15,10 @@ import {
   query,
   where,
   writeBatch,
-  getDoc, orderBy, limit,
+  getDoc, orderBy, limit, documentId,
 } from "firebase/firestore";
 import { initialState } from "./domain.js";
+import { istDate, DAY } from './analytics.js';
 export async function connect(onChange, onAuth) {
   const app = initializeApp({
     apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -44,6 +45,17 @@ export async function connect(onChange, onAuth) {
     }
     onAuth(user);
     const state = initialState();
+    let analyticsParts = 0;
+    const analyticsError = () => { state.analyticsUnavailable = true; state.analyticsLoaded = true; onChange(structuredClone(state)); };
+    subscriptions.push(onSnapshot(query(collection(db, 'analyticsDays'), where(documentId(), '>=', istDate(Date.now() - 30 * DAY))), s => {
+      state.analyticsDays = s.docs.map(d => ({ ...d.data(), id: d.id }));
+      analyticsParts |= 1; state.analyticsLoaded = analyticsParts === 3;
+      onChange(structuredClone(state));
+    }, analyticsError));
+    subscriptions.push(onSnapshot(doc(db, 'analytics', 'meta'), s => {
+      state.analyticsMeta = s.data() || {}; analyticsParts |= 2; state.analyticsLoaded = analyticsParts === 3;
+      onChange(structuredClone(state));
+    }, analyticsError));
     for (const name of ["projects", "tasks", "reports", "previews", "ideas"]) {
       const ref =
         name === "ideas" ? query(collection(db, name), orderBy("updatedAt", "desc"), limit(12)) : name === "previews" ? query(collection(db, name), orderBy("capturedAt", "desc"), limit(12)) : name === "reports"

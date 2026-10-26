@@ -1,6 +1,7 @@
 // Shared, decorative line icons; visible labels provide accessible names.
 const paths = {
   brand: '<path d="M3 20 12 3l9 17h-7l-3-5-3 5Z"/>',
+  chart: '<path d="M3 3v18h18M7 16v-5m5 5V6m5 10v-8"/>',
   home: '<path d="m3 10 9-7 9 7v10h-6v-7H9v7H3Z"/>',
   folder: '<path d="M3 6h7l2 3h9v11H3Z"/>',
   clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v6l4 2"/>',

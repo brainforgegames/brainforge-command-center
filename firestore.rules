@@ -24,6 +24,8 @@ service cloud.firestore {
    match /images/{imageId} { allow read: if admin(); allow write: if false; }
   }
   match /reports/{id} { allow read: if admin(); }
+  match /analyticsDays/{id} { allow read: if admin(); allow write: if false; }
+  match /analytics/meta { allow read: if admin(); allow write: if false; }
   match /worker/status { allow read: if admin(); }
   match /{document=**} { allow read, write: if false; }
  }

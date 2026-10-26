@@ -1,4 +1,5 @@
 import { verificationRetry } from "./recovery.mjs";
+import { recordRun, observedUsage, sessionUsage } from "./analytics.mjs";
 import { acquireLaneLock } from "./lane-lock.mjs";
 import { randomUUID } from "node:crypto";
 import { Coordinator, transientCapacity, eligible } from "./coordination.mjs";
@@ -84,6 +85,21 @@ function checkpoint() {
 cp.ownerToken ||= randomUUID();
 await checkpoint();
 const db = database(cfg.firebaseProjectId, cfg.credentialMode);
+// Replay only sanitized pending measurements, never prompt/event contents.
+async function flushAnalytics() {
+  if (cp.analyticsActive) {
+    cp.analyticsPending ||= [];
+    cp.analyticsPending.push({ ...cp.analyticsActive, end: cp.analyticsActive.observedAt || cp.analyticsActive.start, usage: null, state: 'interrupted-partial' });
+    delete cp.analyticsActive;
+    await checkpoint();
+  }
+  while (cp.analyticsPending?.length) {
+    await recordRun(db, cp.analyticsPending[0]);
+    cp.analyticsPending.shift();
+    await checkpoint();
+  }
+}
+await flushAnalytics().catch(() => console.error('Analytics upload deferred; preserved in the local checkpoint.'));
 const coordination = new Coordinator(db, lane, cp.ownerToken, cfg.projects, cfg.maxRunMinutes);
 let activeClaim = null, activeSliceStarted = 0, runtimeDeadline = Infinity;
 class ControlPause extends Error {}
@@ -128,7 +144,7 @@ function command(
   exe,
   args,
   cwd,
-  { input, timeout = 60000, onLine, shouldStop } = {},
+  { input, timeout = 60000, onLine, shouldStop, onSpawn } = {},
 ) {
   return new Promise((resolve, reject) => {
     if (process.platform === "win32" && /^git(?:\.exe)?$/.test(exe))
@@ -165,6 +181,8 @@ function command(
       shell: false,
       stdio: ["pipe", "pipe", "pipe"],
     });
+    let processStartedAt = null;
+    child.once('spawn', () => { processStartedAt = Date.now(); onSpawn?.(processStartedAt); });
     let out = "",
       err = "",
       buffer = "",
@@ -213,7 +231,7 @@ function command(
       clearTimeout(timer);
       clearInterval(monitor);
       if (buffer) onLine?.(buffer);
-      resolve({ code, out, err, stopped, timedOut });
+      resolve({ code, out, err, stopped, timedOut, processStartedAt, processEndedAt: Date.now() });
     });
     child.stdin.end(input || "");
   });
@@ -497,7 +515,15 @@ async function tick() {
         "-",
       ]
     : [...base, "-"];
+  const resumed = !!cp.task.session;
+  const usageSession = cp.task.session;
+  const baseline = resumed ? await sessionUsage(cp.task.session) : { input: 0, output: 0, cached: 0 };
   const started = Date.now();
+  let analyticsLastCheckpoint = started;
+  if (!cp.task.readyResult) {
+    cp.analyticsActive = { id: randomUUID(), projectId: task.projectId, start: started, observedAt: started };
+    await checkpoint();
+  }
   const duration = Math.max(
     1,
     Math.min(cfg.maxRunMinutes * 60000, nextPause().getTime() - Date.now()),
@@ -508,10 +534,15 @@ async function tick() {
       input: prompt,
       timeout: duration,
       shouldStop: shouldStopWork,
+      onSpawn: at => { cp.analyticsActive.start = at; cp.analyticsActive.observedAt = at; void checkpoint(); },
       onLine: (line) => {
         try {
           const e = JSON.parse(line);
           events.push(e);
+          if (cp.analyticsActive) {
+            cp.analyticsActive.observedAt = Date.now();
+            if (Date.now() - analyticsLastCheckpoint >= 15000) { analyticsLastCheckpoint = Date.now(); void checkpoint(); }
+          }
           if (e.type === "thread.started") {
             cp.task.session = e.thread_id;
             void checkpoint();
@@ -521,6 +552,15 @@ async function tick() {
     });
   } catch (e) {
     r = { code: 1, out: "", err: e.message, stopped: false };
+  }
+  if (cp.analyticsActive) {
+    const total = await sessionUsage(cp.task.session);
+    const knownBaseline = resumed && cp.task.session !== usageSession ? null : baseline;
+    const measured = r.processStartedAt ? observedUsage(events, knownBaseline, total) : { usage: null, tokenPartial: false };
+    cp.analyticsPending ||= [];
+    cp.analyticsPending.push({ id: cp.analyticsActive.id, projectId: task.projectId, start: r.processStartedAt || started, end: r.processEndedAt || started, ...measured, state: r.stopped ? 'stopped' : r.code === 0 ? 'finished' : 'failed' });
+    delete cp.analyticsActive;
+    await checkpoint();
   }
   await coordination.finishSlice(task.id, (Date.now()-started)/60000);
   cp.served[task.projectId] =
@@ -873,6 +913,7 @@ try {
         await coordination.finishSlice(activeClaim,(Date.now()-activeSliceStarted)/60000,terminal);
         activeClaim = null;
       }
+      await flushAnalytics().catch(() => console.error('Analytics upload deferred; preserved in the local checkpoint.'));
     }
     if (once) break;
     await new Promise((r) => setTimeout(r, 60000));

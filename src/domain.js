@@ -72,6 +72,9 @@ export function initialState() {
     tasks: [],
     feedback: [],
     reports: [],
+    analyticsDays: [],
+    analyticsMeta: {},
+    analyticsLoaded: false,
     settings: { instructions: QUALITY, workerEnabled: false },
     worker: { status: "Not connected", lastSeen: null, quota: null },
   };

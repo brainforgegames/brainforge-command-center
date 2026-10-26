@@ -47,6 +47,21 @@ const task = {
   approved: true,
   createdAt: 1000,
 };
+test('analytics aggregates are private and client read-only; raw ledgers stay server-only', async () => {
+  await env.withSecurityRulesDisabled(async ctx => {
+    for (const path of ['analyticsDays/2026-10-27', 'analytics/meta', 'analyticsRuns/run', 'analyticsCompletions/task']) await setDoc(doc(ctx.firestore(), path), { synthetic: true });
+  });
+  for (const ctx of [env.unauthenticatedContext(), env.authenticatedContext('stranger')]) {
+    await assertFails(getDocs(collection(ctx.firestore(), 'analyticsDays')));
+    await assertFails(getDoc(doc(ctx.firestore(), 'analytics/meta')));
+  }
+  const db = env.authenticatedContext('owner').firestore();
+  await assertSucceeds(getDocs(collection(db, 'analyticsDays')));
+  await assertSucceeds(getDoc(doc(db, 'analytics/meta')));
+  for (const path of ['analyticsDays/2026-10-27', 'analytics/meta', 'analyticsRuns/run', 'analyticsCompletions/task']) await assertFails(setDoc(doc(db, path), { forged: true }));
+  await assertFails(getDoc(doc(db, 'analyticsRuns/run')));
+  await assertFails(getDoc(doc(db, 'analyticsCompletions/task')));
+});
 test("anonymous and other signed-in accounts cannot read or write", async () => {
   for (const ctx of [
     env.unauthenticatedContext(),
