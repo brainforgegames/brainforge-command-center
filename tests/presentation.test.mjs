@@ -99,3 +99,8 @@ test("project lists prioritize enabled shares and place parked projects last wit
  assert.deepEqual(priorityProjects(projects).map(p=>p.id),['sikhi','bcc','paused','zero']);
  assert.equal(projects[0].id,'paused');
 });
+
+test("saved running work on parked projects is not counted as underway", () => {
+ const s=initialState();s.projects=[{id:'active',enabled:true,weight:90},{id:'parked',enabled:false,weight:0}];s.tasks=[{id:'a',projectId:'active',status:'running'},{id:'p',projectId:'parked',status:'running'}];
+ const v=studioSummary(s);assert.equal(v.active.length,1);assert.equal(v.parked.length,1);assert.equal(v.open.length,2);
+});
