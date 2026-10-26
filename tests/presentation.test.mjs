@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  priorityProjects,
   ownerView,
   studioSummary,
   workerView,
@@ -74,7 +75,7 @@ for (const mixed of [false, true]) {
       { id: "review", status: "review", updatedAt: now, ownerUpdate: { done: "Quiz ready for checks." } },
       { id: "yesterday", status: "done", updatedAt: Date.parse("2026-10-24T23:59:59+05:30") },
       { id: "old-review", status: "review", updatedAt: Date.parse("2026-10-24T23:59:59+05:30") },
-      ...(mixed ? [{ id: "done", status: "done", updatedAt: Date.parse("2026-10-25T00:00:00+05:30"), ownerUpdate: { done: "Scoring fixed." } }] : []),
+      ...(mixed ? [{ id: "done", status: "done", updatedAt: Date.parse("2026-10-25T00:00:00+05:30"), ownerUpdate: { done: "Scoring fixed.", results: [{category: "completed", text: "Scoring fixed."}] } }] : []),
     ];
     const summary = studioSummary(state, now);
     assert.deepEqual(summary.completed.map((t) => t.id), mixed ? ["done"] : []);
@@ -82,13 +83,24 @@ for (const mixed of [false, true]) {
     assert.equal(summary.checking.length, 2);
     assert.equal(summary.questions.length, 0);
     const report = makeReport(state, "2026-10-25", now);
-    const completed = report.sections.find((s) => s.heading === "Completed today").items.join(" ");
-    const review = report.sections.find((s) => s.heading === "Ready for review today").items.join(" ");
+    const completed = report.sections.find((s) => s.heading === "Completed today").items.map(item => typeof item === "string" ? item : item.text).join(" ");
+    const review = report.sections.find((s) => s.heading === "Ready for review today").items.map(item => typeof item === "string" ? item : item.text).join(" ");
     assert.doesNotMatch(completed, /Quiz ready/);
-    assert.match(completed, mixed ? /Scoring fixed.*IST/ : /No completed result/);
+    assert.match(completed, mixed ? /Scoring fixed.*IST/ : /^$/);
     assert.match(review, /Quiz ready.*IST/);
     assert.doesNotMatch(review, /Scoring fixed/);
     assert.match(review, /I handle the review/);
     assert.match(report.sections.find((s) => s.heading === "Your help").items[0], /Nothing needed/);
   });
 }
+
+test("project lists prioritize enabled shares and place parked projects last without mutating input", () => {
+ const projects=[{id:'paused',weight:95,enabled:false},{id:'bcc',weight:10,enabled:true},{id:'sikhi',weight:90,enabled:true},{id:'zero',weight:0,enabled:true}];
+ assert.deepEqual(priorityProjects(projects).map(p=>p.id),['sikhi','bcc','paused','zero']);
+ assert.equal(projects[0].id,'paused');
+});
+
+test("saved running work on parked projects is not counted as underway", () => {
+ const s=initialState();s.projects=[{id:'active',enabled:true,weight:90},{id:'parked',enabled:false,weight:0}];s.tasks=[{id:'a',projectId:'active',status:'running'},{id:'p',projectId:'parked',status:'running'}];
+ const v=studioSummary(s);assert.equal(v.active.length,1);assert.equal(v.parked.length,1);assert.equal(v.open.length,2);
+});

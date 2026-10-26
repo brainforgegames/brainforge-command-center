@@ -1,4 +1,5 @@
 import { istParts } from "./domain.js";
+import { taskResults } from "./report-results.js";
 export const statusLabels = {
   queued: "Planned",
   running: "In progress",
@@ -6,6 +7,10 @@ export const statusLabels = {
   blocked: "Issue to resolve",
   done: "Completed",
 };
+export const priorityProjects = (projects) => [...projects].sort((a,b) => {
+  const active = p => p.enabled && Number(p.weight) > 0;
+  return Number(active(b))-Number(active(a)) || Number(b.weight||0)-Number(a.weight||0) || String(a.name||a.id).localeCompare(String(b.name||b.id));
+});
 export const stamp = (t) => Number(t.updatedAt || t.createdAt || 0);
 export const recentFirst = (tasks) =>
   [...tasks].sort((a, b) => stamp(b) - stamp(a));
@@ -30,10 +35,9 @@ export function ownerView(task) {
     title:
       u.title || (research ? "Find the best next improvements" : task.title),
     done:
-      u.done ||
-      (task.status === "done"
-        ? "Marked complete. The work notes contain the recorded result."
-        : task.status === "review"
+      task.status === "done"
+        ? taskResults(task).completed.join("\n") || "No verified outcome recorded. See the original work notes."
+        : u.done || (task.status === "review"
           ? "A first version is ready. I still need to finish my review."
           : task.status === "running"
             ? "Work is underway. No completed result recorded yet."
@@ -85,7 +89,7 @@ export function studioSummary(state, now = Date.now(), includeStudio = true) {
     open: state.tasks.filter((t) => t.status !== "done"),
     checking: tasks.filter((t) => t.status === "review"),
     today,
-    completed: today.filter((t) => t.status === "done"),
+    completed: today.filter((t) => taskResults(t).completed.length > 0),
     readyForReview: today.filter((t) => t.status === "review"),
     issues: tasks.filter((t) => t.status === "blocked"),
     questions: tasks
@@ -108,7 +112,8 @@ export function studioSummary(state, now = Date.now(), includeStudio = true) {
             ]
           : [],
       ),
-    active: tasks.filter((t) => t.status === "running"),
+    active: tasks.filter((t) => t.status === "running" && state.projects.some(p => p.id === t.projectId && p.enabled && p.weight > 0)),
+    parked: tasks.filter((t) => t.status === "running" && !state.projects.some(p => p.id === t.projectId && p.enabled && p.weight > 0)),
     planned: tasks.filter((t) => t.status === "queued"),
   };
 }

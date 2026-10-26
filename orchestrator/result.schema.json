@@ -1,18 +1,69 @@
 {
   "type": "object",
   "properties": {
-    "status": { "type": "string", "enum": ["review", "blocked", "verify"] },
-    "summary": { "type": "string" },
+    "status": {
+      "type": "string",
+      "enum": [
+        "review",
+        "blocked",
+        "verify"
+      ]
+    },
+    "summary": {
+      "type": "string"
+    },
     "ownerUpdate": {
       "type": "object",
       "properties": {
-        "title": { "type": "string" },
-        "done": { "type": "string" },
-        "issue": { "type": "string" },
-        "next": { "type": "string" },
-        "needsOwner": { "type": "boolean" },
-        "question": { "type": "string" },
-        "answerHint": { "type": "string" }
+        "title": {
+          "type": "string"
+        },
+        "done": {
+          "type": "string"
+        },
+        "issue": {
+          "type": "string"
+        },
+        "next": {
+          "type": "string"
+        },
+        "needsOwner": {
+          "type": "boolean"
+        },
+        "question": {
+          "type": "string"
+        },
+        "answerHint": {
+          "type": "string"
+        },
+        "results": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "category": {
+                "type": "string",
+                "enum": [
+                  "completed",
+                  "limitation",
+                  "pending",
+                  "proposal",
+                  "next"
+                ]
+              },
+              "text": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160
+              }
+            },
+            "required": [
+              "category",
+              "text"
+            ],
+            "additionalProperties": false
+          }
+        }
       },
       "required": [
         "title",
@@ -21,11 +72,16 @@
         "next",
         "needsOwner",
         "question",
-        "answerHint"
+        "answerHint",
+        "results"
       ],
       "additionalProperties": false
     }
   },
-  "required": ["status", "summary", "ownerUpdate"],
+  "required": [
+    "status",
+    "summary",
+    "ownerUpdate"
+  ],
   "additionalProperties": false
 }

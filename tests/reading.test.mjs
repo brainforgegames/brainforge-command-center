@@ -11,7 +11,7 @@ test("stat drilldowns contain exactly the counted updates and open work, at Indi
   const summary=studioSummary(s,now);
   assert.deepEqual(workRows(s,"today","all","all",now).map(t=>t.id),summary.today.map(t=>t.id));
   assert.deepEqual(workRows(s,"open","all","all",now).map(t=>t.id),summary.open.map(t=>t.id));
-  assert.equal(summary.completed.length,1); // A studio check-in is not finished product work.
+  assert.equal(summary.completed.length,0); // Neither a studio check-in nor an unclassified note certifies an outcome.
   assert.equal(ownerView(workRows(s,"today","all","all",now).find(t=>t.id==="studio-update")).done,"Checks continue.");
   assert.deepEqual(workRows(s,"today","a","review",now).map(t=>t.id),["draft"]);
   assert.deepEqual(workRows(s,"open","all","done",now),[]);

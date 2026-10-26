@@ -27,6 +27,7 @@ export function noteSections(value) {
 }
 
 export function reportEntry(value) {
+  if (value && typeof value === "object") return reportEntry(value.text);
   const raw = String(value || ""), parts = raw.split(/\s+·\s+(?=\d{1,2}\s+[A-Za-z]{3},)/);
   const body = parts[0], prefix = body.match(/^([^:]{1,48}):\s+(.*)$/s);
   return { project: prefix?.[1] || "Studio update", items: readableBullets(prefix?.[2] || body), time: parts.slice(1).join(" · ") };

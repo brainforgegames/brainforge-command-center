@@ -1,5 +1,6 @@
 import { isPaused, istParts, selectTask } from "../src/domain.js";
 import { ownerView, studioSummary, stamp, when } from "../src/presentation.js";
+import { taskResults } from "../src/report-results.js";
 export { isPaused, istParts, selectTask };
 export function nextPause(now = new Date()) {
   const p = istParts(now);
@@ -45,13 +46,17 @@ export function makeReport(state, date, now = Date.now()) {
       return [
         {
           heading: "Completed today",
+          category: "completed",
           items: s.completed
-            .map((t) => label(t) + ownerView(t).done + " \u00b7 " + when(stamp(t)))
-            .concat(
-              s.completed.length
-                ? []
-                : ["No completed result recorded today yet."],
-            ),
+            .flatMap((t) => taskResults(t).completed.map(text => ({
+              category: "completed", status: "done", taskId: t.id || "",
+              text: label(t) + text + " \u00b7 " + when(stamp(t)),
+            }))),
+        },
+        {
+          heading: "Result details and limitations",
+          category: "details",
+          items: s.today.flatMap(t => taskResults(t).details.map(text => label(t) + text)),
         },
         {
           heading: "Ready for review today",
