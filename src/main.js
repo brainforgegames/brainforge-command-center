@@ -1,3 +1,4 @@
+import { createNavigation } from "./navigation.js";
 import "./style.css";
 import { analyticsPage } from './analytics-page.js';
 import { analyticsView, workerTime } from './analytics.js';
@@ -231,7 +232,7 @@ function bind() {
   }
 
   document.querySelector(".preview-expanded img")?.addEventListener("error", () => { previewImage = null; previewError = "This image could not be displayed. Please try opening it again."; render(); document.querySelector(`[data-preview="${previewOpener}"]`)?.focus(); });
-  document.querySelector("#preview-filter")?.addEventListener("change", e => { previewFilter = e.target.value; render(); });
+  document.querySelector("#preview-filter")?.addEventListener("change", e => { previewFilter = e.target.value; navigate(); });
   document.querySelector("#close-preview")?.addEventListener("click", closePreview);
   document.querySelectorAll("[data-preview]").forEach(el => el.onclick = async () => {
     const item = (state.previews || []).find(p => p.id === el.dataset.preview);
@@ -332,8 +333,7 @@ function bind() {
         page = el.dataset.page;
         if (page === "Work board") { workView = "all"; projectFilter = "all"; statusFilter = "all"; }
         menu = false;
-        render();
-        window.scrollTo(0, 0);
+        navigate();
       }),
   );
   document.querySelectorAll("[data-project]").forEach(
@@ -343,17 +343,16 @@ function bind() {
         workView = "all";
         statusFilter = "all";
         page = "Work board";
-        render();
-        window.scrollTo(0, 0);
+        navigate();
       }),
   );
   const openWork = (view, status = "all") => {
     workView = view; projectFilter = "all"; statusFilter = status;
-    page = "Work board"; menu = false; render(); window.scrollTo(0,0);
+    page = "Work board"; navigate();
   };
   document.querySelectorAll("[data-work-view]").forEach((el) => el.onclick = () => openWork(el.dataset.workView));
   document.querySelector("[data-review-today]")?.addEventListener("click", () => openWork("today","review"));
-  document.querySelector("#work-view")?.addEventListener("change", (e) => { workView=e.target.value; render(); });
+  document.querySelector("#work-view")?.addEventListener("change", (e) => { workView=e.target.value; navigate(); });
   document.querySelector("#menu").onclick = () => {
     menu = !menu;
     render();
@@ -374,11 +373,11 @@ function bind() {
     );
   document.querySelector("#project-filter")?.addEventListener("change", (e) => {
     projectFilter = e.target.value;
-    render();
+    navigate();
   });
   document.querySelector("#status-filter")?.addEventListener("change", (e) => {
     statusFilter = e.target.value;
-    render();
+    navigate();
   });
   document
     .querySelector("#worker-toggle")
@@ -419,7 +418,26 @@ document.addEventListener("keydown", (e) => {
     document.querySelector("#menu")?.focus();
   }
 });
-render();
+function navigate() {
+  menu = false;
+  if (!navigation.navigate({ page, workView, projectFilter, statusFilter, previewFilter })) render();
+}
+const navigation = createNavigation(window, route => {
+  const activeFilter = document.activeElement?.matches("select") ? document.activeElement.id : null;
+  const previousPage = page;
+  ({ page, workView, projectFilter, statusFilter, previewFilter } = route);
+  menu = false;
+  selectedIdea = null; ideaAlternate = false;
+  previewImage = null; previewError = ""; previewBusy = false; ++previewRequest;
+  render();
+  if (activeFilter && previousPage === page) document.getElementById(activeFilter)?.focus({ preventScroll: true });
+  else {
+    const heading = document.querySelector("h1");
+    heading?.setAttribute("tabindex", "-1");
+    heading?.focus({ preventScroll: true });
+    window.scrollTo(0, 0);
+  }
+});
 void boot(
   (s) => {
     state = s;

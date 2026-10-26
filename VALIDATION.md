@@ -147,6 +147,14 @@ Two-worker runtime source validation (26 October 2026): 48 Node tests passed, in
 
 Visual idea library validation (26 October 2026): 48 Node tests passed, including schema bounds, escaping, semantic cards/dialogs and two distinct SVG states per mechanic. Production build passed. All 6 Firestore emulator access tests passed, including admin-only proposal reads and denied client writes. Actual proposal data was not seeded or published. DEV-only samples are synthetic. Browser automation was unavailable (empty browser inventory); desktop/mobile visual review, keyboard focus return and native dialog behaviour remain integration checks. Isolated sample server: http://127.0.0.1:5191/?sample=1.
 
+## 2026-10-27 01:00 IST - Browser Back and Forward navigation
+
+- Added GitHub Pages-compatible hash routes for all existing pages, work filters/project drilldowns, and screenshot project filters. Initial and refreshed deep links restore the view; unknown routes replace the current entry with Today.
+- Only explicit navigation pushes history. Repeated destinations, render/live updates and authentication callbacks do not add entries. Initial routing uses replacement rather than a Back-trapping sentinel. Existing pathname/query (including preview mode) are preserved.
+- Navigation clears transient dialogs and screenshot bytes, invalidates pending screenshot requests, closes the mobile menu, and retains the existing private-data gate. Route URLs contain only page/filter identifiers. Page changes focus the heading; filter changes retain keyboard focus.
+- New navigation tests cover all pages, deep links/refresh, filtered Back/Forward, paired browser events, manual hash changes, malformed routes, duplicate suppression, and leaving the first entry.
+- Checks: five navigation tests pass with `node --test --test-isolation=none tests/navigation.test.mjs`; full in-process suite: 65 pass, one blocked by `spawnSync git EPERM`. Standard test invocation is blocked by child-process `spawn EPERM`. Direct Vite build is blocked by esbuild `spawn EPERM`. JavaScript syntax checks and `git diff --check` pass.
+- Dependency installation was attempted; no clean install completion is claimed. Orchestrator must run its configured clean install, tests and build outside these sandbox process restrictions. No browser visual smoke check is claimed. Changes remain uncommitted; nothing was pushed, merged, deployed or published.
 ## 2026-10-27 — Worker analytics source implementation
 
 - Added Analytics navigation, hourly Today and daily 7/30-day IST charts, project worker-time ranking/share, completed-task comparison, token coverage, project token values and keyboard-accessible chart/table values. Mobile chart bars scroll horizontally with minimum 32px width; dark styling follows the dashboard. Loading, access failure, missing history, partial collection and empty recorded periods have separate copy.
@@ -203,3 +211,8 @@ Visual idea library validation (26 October 2026): 48 Node tests passed, includin
 - Browser smoke checks: Analytics opens; Today, 7-day and 30-day selection and time/token/completed views respond; narrow layout inspected. No historic data invented.
 
 - Checked a 390px phone fixture with clearly labelled fictional values; stacked narrow-screen Analytics selectors so date labels remain readable.
+
+## 27 October 2026 - browser navigation integration
+- Merged current main into the existing browser-history change, preserving the released design and clean Analytics layout. Resolved the validation-log conflict by keeping both records.
+- Added Analytics to the route map so opening it does not incorrectly return to Today; its refresh and Back/Forward traversal have focused regression coverage.
+- Host full suite passed (74 tests before the added Analytics traversal check); production build passed. Focused navigation suite passed after that addition. No Firestore data or worker runtime modified.
