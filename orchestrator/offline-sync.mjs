@@ -129,8 +129,15 @@ export async function syncOnce(cloud,file,options={}) {
   const result=await replayOutbox(cloud,file,options);
   const sync=await mutateLocalState(file,s=>{
    const view=queueSyncView(s);
-   if(!result.conflicts && view.pending===0 && view.state!=='Needs reconciliation'){s.sync||={};s.sync.lastSuccessAt=options.now??Date.now();}
+   if(!result.conflicts && view.pending===0 && view.state!=='Needs reconciliation'){s.sync||={};s.sync.lastSuccessAt=Math.max(s.sync.lastSuccessAt||0,options.now??Date.now());}
    return queueSyncView(s);
+  });
+  // Queue synchronization can finish without a new worker heartbeat. Publish
+  // its post-replay state independently, preserving the newest worker telemetry.
+  await cloud.runTransaction(async tx=>{
+   const ref=cloud.doc('worker/status'),remote=(await tx.get(ref)).data();
+   if(!remote || (remote.queueSync?.observedAt||0)>sync.observedAt)return;
+   tx.set(ref,{...remote,queueSync:sync});
   });
   return {status:sync.state==='Needs reconciliation'?'conflict':sync.pending?'pending':'synced',...result};
  }catch(error){

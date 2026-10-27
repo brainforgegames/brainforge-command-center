@@ -47,3 +47,10 @@ test('loopback queue endpoint rejects foreign origins, foreign hosts and writes'
   assert.ok([403,405].includes(status));
  }
 });
+
+test('board orders projects by saved share before task priority and labels extended priorities',()=>{
+ const s=initialState();s.projects=[{id:'sikhi',name:'Sikhi',enabled:true,weight:90},{id:'bcc',name:'BCC',enabled:true,weight:10},{id:'parked',name:'Parked',enabled:false,weight:0}];
+ s.tasks=[{id:'bcc-high',projectId:'bcc',status:'queued',priority:9},{id:'sikhi-low',projectId:'sikhi',status:'queued',priority:1},{id:'sikhi-high',projectId:'sikhi',status:'queued',priority:8},{id:'parked',projectId:'parked',status:'queued',priority:100}];
+ assert.deepEqual(boardColumns(s)[0].tasks.map(t=>t.id),['sikhi-high','sikhi-low','bcc-high','parked']);
+ const html=boardCard(s,s.tasks[0],v=>String(v??''));assert.match(html,/Priority 9/);assert.ok(!html.includes('Priority unset'));
+});

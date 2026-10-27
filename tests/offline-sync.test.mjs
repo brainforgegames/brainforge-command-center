@@ -115,3 +115,13 @@ test('analytics aggregation conflicts preserve newer cloud counts and all transa
  assert.deepEqual(cloud.values.get('analyticsDays/2026-10-27'),{completed:10});assert.equal(cloud.values.has('analyticsCompletions/local-task'),false);
  assert.equal((await readLocalState(file)).outbox.length,1);
 }));
+
+test('successful replay publishes final sync state even with a newer cloud heartbeat',()=>fixture(async({file,db,cloud})=>{
+ await db.doc('tasks/one').update({status:'review',result:'Saved result'});
+ await db.doc('worker/status').set({status:'Older local heartbeat',lastSeen:500,workers:{'lane-1':{status:'Idle',lastSeen:500}}});
+ cloud.values.set('worker/status',{status:'Newest cloud heartbeat',lastSeen:1000,workers:{'lane-2':{status:'Working: newer task',lastSeen:1000}}});
+ const result=await syncOnce(cloud,file,{now:2000});assert.equal(result.status,'synced');
+ const status=cloud.values.get('worker/status');assert.equal(status.lastSeen,1000);assert.equal(status.status,'Newest cloud heartbeat');assert.equal(status.workers['lane-2'].status,'Working: newer task');
+ assert.equal(status.queueSync.pending,0);assert.equal(status.queueSync.lastSuccessAt,2000);assert.equal(status.queueSync.state,'Local queue saved');
+ assert.equal((await readLocalState(file)).outbox.length,0);
+}));
