@@ -1,13 +1,31 @@
 import { initialState, reportVisible } from "./domain.js";
 import { validateAllocation } from "./allocation.js";
 const configured = !!import.meta.env.VITE_FIREBASE_PROJECT_ID;
-export const mode = configured ? "firebase" : "demo";
+export let mode = configured ? "firebase" : "demo";
 let data = initialState(),
   callback = () => {},
   remote = null;
 export const snapshot = () => structuredClone(data);
 export async function boot(onChange, onAuth) {
   callback = onChange;
+  // Opt-in loopback server exposes the coordinator's queue read-only.
+  if (location.hostname === '127.0.0.1' || location.hostname === 'localhost') {
+    try {
+      const response=await fetch('/api/local-board',{cache:'no-store'});
+      if(response.headers.get('content-type')?.includes('application/json')) {
+        mode='local';
+        const refresh=async()=>{
+          try {
+            const res=await fetch('/api/local-board',{cache:'no-store'});
+            if(!res.ok)throw Error('Queue unavailable');
+            data={...initialState(),...await res.json(),analyticsLoaded:true};
+          } catch { data.queueSync={...data.queueSync,state:'Local queue unavailable · showing last view'}; }
+          callback(snapshot());
+        };
+        await refresh();onAuth({local:true});setInterval(refresh,10000);return;
+      }
+    } catch { /* No local queue server: use the configured cloud or preview. */ }
+  }
   if (!configured) {
     if (
       import.meta.env.DEV &&
@@ -41,6 +59,7 @@ export async function boot(onChange, onAuth) {
   }, onAuth);
 }
 export async function save(collection, id, value) {
+  if(mode==='local')throw Error('Discuss changes in chat; this board reads the durable worker queue.');
   if (remote) return remote.save(collection, id, value);
   if (collection === "settings") data.settings = { ...data.settings, ...value };
   else {
@@ -54,6 +73,7 @@ export async function save(collection, id, value) {
 }
 export const login = () => remote?.login();
 export async function saveAllocations(values) {
+  if(mode==='local')throw Error('Discuss priority changes in chat; this board reads the durable worker queue.');
   const rows = validateAllocation(data.projects, values);
   if (remote) return remote.saveAllocations(rows);
   data.projects = data.projects.map((p) => ({

@@ -26,6 +26,10 @@ export class Coordinator {
    if((c.cooldownUntil||0)>this.clock()) return null;
    c.claims ||= {}; c.served ||= {};
    if (Object.entries(c.claims).some(([id,x])=>x.token===this.token && id!==resumeId && !knownIds.includes(id))) throw Error("Owned claim has no local task checkpoint; inspect before starting another task.");
+   // Known parked checkpoints may retain ownership, but cannot authorize two
+   // runnable tasks in one lane or let a new token take over that lane.
+   if (Object.entries(c.claims).some(([id,x])=>(x.lane===this.lane || x.token===this.token) &&
+     (x.token!==this.token || (id!==resumeId && tasks.some(t=>t.id===id && eligible(t,projects,settings,this.clock())))))) return null;
    const available=tasks.filter(t=>eligible(t,projects,settings,this.clock()) && (!c.claims[t.id] || c.claims[t.id].token===this.token) && !Object.entries(c.claims).some(([id,x])=>x.target===targetKey(t,this.mappings)&&id!==t.id));
    let task=resumeId ? available.find(t=>t.id===resumeId&&c.claims[t.id]?.token===this.token) : selectScheduledTask(projects,available.filter(t=>t.status==='queued'&&!c.claims[t.id]),c.served,settings,tasks);
    if(!task) return null;
