@@ -28,3 +28,9 @@ Snapshot: 27 October 2026. All workers, reports and supervisor automation are pa
 - npm run dev: local preview. npm run build: production build. npm test: tests when relevant.
 - GitHub Pages uses a manually dispatched workflow. Do not deploy unless the owner's current task calls for publication.
 - OWNER_INSTRUCTIONS.md records dated owner preferences; its newest command-only override supersedes historical always-working requirements.
+
+## Manual records update (27 October)
+
+- Dashboard navigation now keeps Today, Projects, Analytics, Work board, Reports and Ideas. Retired automation pages return to Today.
+- Today and Reports describe command-only work and records on request. Existing records are preserved.
+- Analytics shows tokens in millions throughout; historical collector data does not automatically include manual chats.

@@ -1,8 +1,4 @@
-const pages = {
-  today: 'Today', projects: 'Projects', 'time-split': 'Time split',
-  work: 'Work board', workers: 'Workers', help: 'Your help',
-  reports: 'Reports', analytics: 'Analytics', screenshots: 'Screenshots', ideas: 'Ideas', settings: 'Settings',
-};
+const pages = { today: 'Today', projects: 'Projects', work: 'Work board', reports: 'Reports', analytics: 'Analytics', ideas: 'Ideas' };
 const project = value => /^[a-z0-9][a-z0-9_-]{0,99}$/.test(value || '') ? value : 'all';
 const choice = (value, values) => values.includes(value) ? value : 'all';
 

@@ -11,7 +11,7 @@ function browser(hash='') {
  b.entries=entries;sync();return b;
 }
 test('every page round trips and private content never enters a route',()=>{
- for(const page of ['Today','Projects','Time split','Work board','Workers','Your help','Reports','Analytics','Screenshots','Ideas','Settings'])assert.equal(parseRoute(routeHash({page})).page,page);
+ for(const page of ['Today','Projects','Work board','Reports','Analytics','Ideas'])assert.equal(parseRoute(routeHash({page})).page,page);
  assert.equal(routeHash({page:'Ideas',secret:'private report',selectedIdea:'private-id'}),'#/ideas');
 });
 test('deep links and refresh preserve drilldown filters without adding entries',()=>{
@@ -34,7 +34,7 @@ test('same destination and data refresh do not add history; first Back can leave
 test('unknown and malformed routes safely replace current entry and manual hashes work',()=>{
  for(const hash of ['#/missing','javascript:alert(1)','#/%E0%A4%A']){const b=browser(hash);createNavigation(b,r=>assert.equal(r.page,'Today'));assert.equal(b.entries.length,2);assert.equal(b.location.hash,'#/today');}
  assert.equal(routeHash(parseRoute('#/work?view=no&status=no&project=%3Cscript%3E')),'#/work');
- const b=browser(),seen=[];createNavigation(b,r=>seen.push(r));b.editHash('#/screenshots?project=sikhi-khoj');assert.equal(seen.at(-1).previewFilter,'sikhi-khoj');b.go(-1);assert.equal(seen.at(-1).page,'Today');
+ const b=browser(),seen=[];createNavigation(b,r=>seen.push(r));b.editHash('#/work?project=sikhi-khoj');assert.equal(seen.at(-1).projectFilter,'sikhi-khoj');b.go(-1);assert.equal(seen.at(-1).page,'Today');
 });
 
 test('Analytics participates in Back and Forward after the design integration',()=>{
@@ -44,3 +44,5 @@ test('Analytics participates in Back and Forward after the design integration',(
  b.go(1);assert.equal(seen.at(-1).page,'Projects');
  const refreshed=browser('#/analytics');createNavigation(refreshed,r=>assert.equal(r.page,'Analytics'));
 });
+
+test('retired automation pages return to Today',()=>{ for(const slug of ['time-split','workers','help','screenshots','settings']) assert.equal(parseRoute('#/'+slug).page,'Today'); });
