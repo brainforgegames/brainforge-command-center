@@ -117,7 +117,7 @@ function projects() {
         !p.enabled || !p.weight
           ? "Paused"
           : s.active.length
-            ? "In progress"
+            ? "Work planned"
             : s.planned.length
               ? "Work planned"
               : s.issues.length
@@ -135,7 +135,7 @@ function today() {
   const next = [...s.active, ...s.planned, ...s.checking, ...s.issues].filter(t => state.projects.some(p => p.id === t.projectId && p.enabled && p.weight > 0));
   return `<div class="stats">
       <button class="stat-card" data-work-view="today"><span class="stat-icon" aria-hidden="true">${icon("reports")}</span><small>Updates today</small><strong>${s.today.length}</strong><span>Changed today · includes drafts</span><b>See all ${s.today.length} updates →</b></button>
-      <button class="stat-card" data-work-view="open"><span class="stat-icon" aria-hidden="true">${icon("tasks")}</span><small>Open work</small><strong>${s.open.length}</strong><span>${s.active.length} underway · ${s.planned.length} planned<br>${s.checking.length} need review · ${s.issues.length} need fixes${s.parked.length ? `<br>${s.parked.length} saved on paused projects` : ""}</span><b>See all ${s.open.length} work items →</b></button>
+      <button class="stat-card" data-work-view="open"><span class="stat-icon" aria-hidden="true">${icon("tasks")}</span><small>Open work</small><strong>${s.open.length}</strong><span>${s.active.length + s.planned.length} to do<br>${s.checking.length} need review · ${s.issues.length} need fixes${s.parked.length ? `<br>${s.parked.length} saved on paused projects` : ""}</span><b>See all ${s.open.length} work items →</b></button>
       <button class="stat-card" data-page="Reports"><span class="stat-icon" aria-hidden="true">${icon("clock")}</span><small>Daily report</small><strong>${state.reports.filter(reportVisible).length}</strong><span>Added on request</span><b>Read the reports →</b></button>
     </div>
     <div class="brief-grid">
@@ -150,16 +150,14 @@ function today() {
 function workBoard() {
   const columns=boardColumns(state,workView,projectFilter,statusFilter);
   const rows=columns.flatMap(c=>c.tasks);
-  return `<div class="page-intro"><p>Saved tasks and results. Discuss new work and feedback in our chat.</p></div><div class="filter-bar"><label>Show<select id="work-view"><option value="all" ${workView === "all" ? "selected" : ""}>All work</option><option value="today" ${workView === "today" ? "selected" : ""}>Updates today</option><option value="open" ${workView === "open" ? "selected" : ""}>Open work</option></select></label><label>Project<select id="project-filter"><option value="all">All projects</option>${state.projects.map((p) => `<option value="${esc(p.id)}" ${p.id === projectFilter ? "selected" : ""}>${esc(p.name)}</option>`).join("")}</select></label><label>Progress<select id="status-filter"><option value="all">All progress</option>${Object.entries(
-    statusLabels,
-  )
+  return `<div class="page-intro"><p>Saved tasks and results. Discuss new work and feedback in our chat.</p></div><div class="filter-bar"><label>Show<select id="work-view"><option value="all" ${workView === "all" ? "selected" : ""}>All work</option><option value="today" ${workView === "today" ? "selected" : ""}>Updates today</option><option value="open" ${workView === "open" ? "selected" : ""}>Open work</option></select></label><label>Project<select id="project-filter"><option value="all">All projects</option>${state.projects.map((p) => `<option value="${esc(p.id)}" ${p.id === projectFilter ? "selected" : ""}>${esc(p.name)}</option>`).join("")}</select></label><label>Progress<select id="status-filter"><option value="all">All progress</option>${columns.map(c => [c.id, c.label])
     .map(
       ([v, l]) =>
         `<option value="${v}" ${v === statusFilter ? "selected" : ""}>${l}</option>`,
     )
     .join(
       "",
-    )}</select></label><span>${rows.length} ${rows.length === 1 ? "task" : "tasks"} · priority first · parked last</span></div><p class="board-sync" role="status">${esc(syncLabel(state.queueSync,mode))}</p><p class="muted">Statuses describe saved records. Work resumes only on your command.</p><div class="task-board" tabindex="0" aria-label="Task board, scroll horizontally for all five lists">${columns.map(c=>`<section class="board-column" aria-label="${esc(c.label)}"><h2>${esc(c.label)} <button data-board-list="board-${c.id}" aria-label="${c.tasks.length} tasks in ${esc(c.label)}">${c.tasks.length}</button></h2><div id="board-${c.id}" class="board-list" tabindex="-1">${c.tasks.map(t=>boardCard(state,t,esc)).join('')||'<p class="board-empty">No tasks in this list.</p>'}</div></section>`).join('')}</div>`;
+    )}</select></label><span>${rows.length} ${rows.length === 1 ? "task" : "tasks"} · priority first · parked last</span></div><p class="board-sync" role="status">${esc(syncLabel(state.queueSync,mode))}</p><p class="muted">Statuses describe saved records. Work resumes only on your command.</p><div class="task-board" tabindex="0" aria-label="Task board, scroll horizontally for all four lists">${columns.map(c=>`<section class="board-column" aria-label="${esc(c.label)}"><h2>${esc(c.label)} <button data-board-list="board-${c.id}" aria-label="${c.tasks.length} tasks in ${esc(c.label)}">${c.tasks.length}</button></h2><div id="board-${c.id}" class="board-list" tabindex="-1">${c.tasks.map(t=>boardCard(state,t,esc)).join('')||'<p class="board-empty">No tasks in this list.</p>'}</div></section>`).join('')}</div>`;
 }
 function reportRows(items) {
   return items.map((item) => { const entry=reportEntry(item); return `<article class="report-item"><strong>${esc(entry.project)}</strong>${bullets(entry.items)}${entry.time ? `<time>${esc(entry.time)}</time>` : ""}</article>`; }).join("");

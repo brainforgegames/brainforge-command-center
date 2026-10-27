@@ -9,7 +9,7 @@ export function parseRoute(hash = '') {
     page,
     workView: page === 'Work board' ? choice(params.get('view'), ['all', 'today', 'open']) : 'all',
     projectFilter: page === 'Work board' ? project(params.get('project')) : 'all',
-    statusFilter: page === 'Work board' ? choice(params.get('status'), ['all', 'queued', 'running', 'review', 'blocked', 'done']) : 'all',
+    statusFilter: page === 'Work board' ? choice(params.get('status') === 'running' ? 'queued' : params.get('status'), ['all', 'queued', 'review', 'blocked', 'done']) : 'all',
     previewFilter: page === 'Screenshots' ? project(params.get('project')) : 'all',
   };
 }
