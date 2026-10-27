@@ -1,6 +1,7 @@
 import {readFile,writeFile,mkdir,rename,unlink,open,rmdir} from 'node:fs/promises';
 import path from 'node:path';
 import {createHash,randomUUID} from 'node:crypto';
+import {notifySupervisor} from './supervisor-notify.mjs';
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 const serial=new Map();
 function clean(value,max=280){
@@ -53,11 +54,13 @@ export async function recordIncident(root,{lane,taskId=null,category,message,now
  const fingerprint=createHash('sha256').update(JSON.stringify([lane,safeTask,safeCategory,safeMessage])).digest('hex');
  const expected=['pause','daily-pause','quota','plan-limit','capacity','model-capacity'].includes(safeCategory);
  const needsReview=/auth|credential|permission|security|owner-input/.test(safeCategory);
- return update(location(root,lane),current=>{
+ const event=await update(location(root,lane),current=>{
   const repeated=current?.fingerprint===fingerprint&&current.state==='pending';
   const value={version:1,lane,taskId:safeTask,category:safeCategory,message:safeMessage,fingerprint,state:'pending',expected,needsReview,retryable:!needsReview&&expected,firstSeen:repeated?current.firstSeen:now,lastSeen:Math.max(now,repeated?current.lastSeen:now),occurrences:repeated?current.occurrences+1:1};
   return {value,result:value};
  });
+ await notifySupervisor(root,event).catch(()=>{});
+ return event;
 }
 export async function resolveIncident(root,lane,{taskId=null,progressAt,evidence}={}){
  return update(location(root,lane),current=>{
