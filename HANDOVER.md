@@ -48,3 +48,5 @@ Snapshot: 27 October 2026. All workers, reports and supervisor automation are pa
 - Review labels read Needs review. Board cards show manual work, with safe change links in task details, and ignore old worker telemetry.
 - Fixed scheduled-report empty text, removed stale account quota from Analytics, and show small positive token values as <0.01M.
 - Focused regressions added; full 137-test suite and production build pass. No deployment authorized for this change.
+
+- Follow-up wording: Today uses Daily report, with no 10 PM schedule; removed the unreachable legacy Settings markup containing the old daily timetable. Still unpublished.
