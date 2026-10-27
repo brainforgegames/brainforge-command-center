@@ -238,3 +238,11 @@ Upstream freshness limitation: git fetch cannot write the shared worktree FETCH_
 ## 27 October 2026 - fallback and browser-history integration
 - Merged main f581d07 into PR21, keeping both validation records. Browser-history and Analytics source changes merged without conflicts.
 - All 84 unit tests, production build and whitespace checks passed. No runtime or Firestore changes.
+
+## 27 October 2026 - active control read budget
+- Active safety checks read coordination, active task, global settings and only that task's project document (four documents); missing task/project or denied controls fail closed. No project-collection scan is used.
+- Concurrent checks on the same coordinator/task share one in-flight request. The worker opts into successful checks cached for at most 30 seconds from request start; denied checks and errors are never cached. Default explicit canRun calls still read fresh controls. No ownership/claim mutation or Unity exclusivity behavior changed.
+- Daily pause and local process deadline/config checks still happen before remote cache use. Remote stop, priority or cooldown changes are detected on the next check after cache expiry: at most 30 seconds of cache age plus the existing 15-second polling interval and network latency. This is a bounded relaxation from fresh reads every 15 seconds, not immediate remote-stop enforcement.
+- At steady 15-second polling, active control reads drop from 4*(3+P) per minute to about 8 per minute per worker (P = project count). With five projects, this is 32 to 8 reads/minute, or 75% fewer. Other queries/status writes and transaction retries are separate; this does not guarantee the total database stays within quota.
+- Regression coverage checks four-document scope, concurrent coalescing, expiry, explicit fresh revocation, ownership/approval/project/cooldown stops, missing documents, read errors, local daily pause and clock rollback. No runtime, scheduled jobs or remote database modified.
+- Host validation: all 94 unit tests, production build, worker/coordinator syntax and whitespace checks passed. Firestore emulator integration was not rerun.
