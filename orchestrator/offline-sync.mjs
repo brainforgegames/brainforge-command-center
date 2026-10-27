@@ -1,11 +1,12 @@
 import {createHash} from 'node:crypto';
 import {seedLocalDatabase,readLocalState,mutateLocalState} from './local-database.mjs';
+import {queueSyncView} from './board-view.mjs';
 const clone=v=>JSON.parse(JSON.stringify(v));
 const canonical=v=>v===undefined?'null':v===null?'null':Array.isArray(v)?'['+v.map(canonical).join(',')+']':typeof v==='object'?'{'+Object.keys(v).sort().map(k=>JSON.stringify(k)+':'+canonical(v[k])).join(',')+'}':JSON.stringify(v);
 export const fingerprint=v=>createHash('sha256').update(canonical(v)).digest('hex');
 const same=(a,b)=>fingerprint(a)===fingerprint(b);
 const allowed=p=>/^(tasks|reports|analyticsRuns|analyticsDays|analyticsCompletions|ideas)\/[^/]+$/.test(p)||p==='analytics/meta'||p==='worker/status';
-const taskControls=['title','acceptance','projectId','target','priority','approved','continuation'];
+const taskControls=['title','acceptance','projectId','target','priority','approved','continuation','dependencies','assignedWorker'];
 function publicMirror(value) {
  if(Array.isArray(value))return value.map(publicMirror);
  if(value&&typeof value==='object')return Object.fromEntries(Object.entries(value).filter(([k])=>!['token','ownerToken','claims','unity'].includes(k)).map(([k,v])=>[k,publicMirror(v)]));
@@ -64,6 +65,7 @@ export async function mirrorWorkerStatus(cloud,file,{now=Date.now()}={}) {
  if(!latest||!Number.isFinite(latest.lastSeen))throw Error('Worker status requires a finite lastSeen timestamp.');
  const pick=(source,keys)=>Object.fromEntries(keys.filter(k=>Object.hasOwn(source,k)).map(k=>[k,clone(source[k])]));
  const status=pick(latest,['status','lastSeen','quota','nextAttemptAt','cooldownReason','ownerQuestion']);
+ status.queueSync=queueSyncView(state);
  status.workers=Object.fromEntries(Object.entries(latest.workers||{}).map(([lane,worker])=>[lane,
   pick(worker,['status','lastSeen','taskId','projectId','quota','nextAttemptAt'])]));
  const changed=await cloud.runTransaction(async tx=>{
@@ -124,7 +126,20 @@ export async function replayOutbox(cloud,file,{limit=20,now=Date.now()}={}) {
 export async function syncOnce(cloud,file,options={}) {
  try {
   await refreshOwnerControls(cloud,file,options);
-  return {status:'synced',...await replayOutbox(cloud,file,options)};
+  const result=await replayOutbox(cloud,file,options);
+  const sync=await mutateLocalState(file,s=>{
+   const view=queueSyncView(s);
+   if(!result.conflicts && view.pending===0 && view.state!=='Needs reconciliation'){s.sync||={};s.sync.lastSuccessAt=Math.max(s.sync.lastSuccessAt||0,options.now??Date.now());}
+   return queueSyncView(s);
+  });
+  // Queue synchronization can finish without a new worker heartbeat. Publish
+  // its post-replay state independently, preserving the newest worker telemetry.
+  await cloud.runTransaction(async tx=>{
+   const ref=cloud.doc('worker/status'),remote=(await tx.get(ref)).data();
+   if(!remote || (remote.queueSync?.observedAt||0)>sync.observedAt)return;
+   tx.set(ref,{...remote,queueSync:sync});
+  });
+  return {status:sync.state==='Needs reconciliation'?'conflict':sync.pending?'pending':'synced',...result};
  }catch(error){
   const reason=cloudFailure(error);
   if(reason==='security'||error.offlineSecurityFailure){error.offlineSecurityFailure=true;throw error;}

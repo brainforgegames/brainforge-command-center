@@ -5,6 +5,7 @@ export function sampleState() {
   s.settings.workerEnabled = true;
   s.worker = { status: "Working", lastSeen: now, quota: 18 };
   s.tasks = [
+    {id:'sample-queued',projectId:'sikhi-khoj',status:'queued',priority:3,approved:true,title:'Improve lesson navigation',acceptance:'Keep the next lesson easy to reach without extra scrolling.',dependencies:[],createdAt:now,updatedAt:now},
     {
       id: "sample-audit",
       projectId: "sikhi-khoj",

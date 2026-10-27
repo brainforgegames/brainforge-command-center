@@ -132,3 +132,23 @@ button.text,.technical summary,.more-items summary { font-size: 16px; }
 .analytics-panels{display:grid;grid-template-columns:minmax(0,2fr) minmax(260px,1fr);gap:20px}.analytics-card{background:#101a2b;border:1px solid #29364d;border-radius:12px;padding:24px;min-width:0}.analytics-card-heading{display:flex;justify-content:space-between;align-items:center;gap:16px}.analytics-card-heading h2{font-size:18px;margin:0}.analytics-card-heading>span{font-size:12px;color:#8fa4c5}.analytics-scale{font-size:12px;color:#8fa4c5;margin-top:26px}.analytics-clean .analytics-chart{height:208px;margin:8px 0 0;gap:5px}.analytics-clean .analytics-column{flex-basis:20px;min-width:20px;gap:8px}.analytics-clean .analytics-bar-track{height:170px;border-bottom-color:#34435b;background:none}.analytics-clean .analytics-bar-track i{background:#6d9bff;border-radius:4px 4px 0 0}.analytics-clean .analytics-column.unknown .analytics-bar-track{background:none;border-bottom-style:dotted}.analytics-clean .analytics-column:focus-visible,.analytics-clean .analytics-column:hover{background:#1d2d48;outline-color:#83adff}.analytics-clean .analytics-column small{font-size:10px;writing-mode:horizontal-tb;color:#8fa4c5}.analytics-clean #analytics-value{font-size:12px;color:#9db0cd;margin:14px 0 0;min-height:18px}.analytics-clean .analytics-project strong{font-size:14px}.analytics-clean .analytics-project span{font-size:13px;color:#b4c5df}.analytics-clean .analytics-horizontal{height:6px;background:#22324b}.analytics-clean .analytics-horizontal i{background:#6d9bff}.analytics-empty{color:#8fa4c5;font-size:14px;padding:50px 12px;text-align:center;line-height:1.6}.analytics-details{margin-top:22px;color:#91a6c6;font-size:13px}.analytics-details summary{font-size:13px;cursor:pointer}.analytics-details p{max-width:85ch;line-height:1.7}
 @media(max-width:1100px){.analytics-panels{grid-template-columns:1fr}.analytics-controls select{min-width:0}.analytics-kpis section{padding:20px}}
 @media(max-width:520px){.analytics-toolbar{align-items:flex-start;flex-direction:column;gap:12px}.analytics-controls{width:100%}.analytics-controls select{width:50%;font-size:13px;padding-right:20px}.analytics-kpis section{padding:15px 10px}.analytics-kpis strong{font-size:24px}.analytics-kpis span{font-size:12px}.analytics-kpis small{font-size:10px;line-height:1.4}.analytics-card{padding:18px}.analytics-card-heading h2{font-size:16px}.analytics-clean .analytics-project{grid-template-columns:1fr auto}}
+
+/* Five stable lists: small screens scroll across instead of hiding workflow states. */
+.task-board { display:grid; grid-template-columns:repeat(5,minmax(260px,1fr)); gap:14px; overflow-x:auto; padding:4px 2px 20px; align-items:start; }
+.board-column { background:#121925; border:1px solid #303a49; border-radius:12px; min-width:0; padding:12px; }
+.board-column>h2 { display:flex; justify-content:space-between; align-items:center; font-size:15px; margin:0 0 14px; color:#f0f3f8; }
+.board-column h2 button { font:inherit; background:#293649; color:#edf3ff; border:0; border-radius:8px; padding:3px 9px; }
+.board-list { display:grid; gap:12px; scroll-margin-top:90px; }
+.board-card { background:#1b2432; border:1px solid #3b4656; border-radius:9px; padding:14px; color:#e0e7f0; overflow-wrap:anywhere; }
+.board-card h3 { font-size:16px; line-height:1.45; margin:12px 0; color:#fff; }
+.board-card p,.board-card dd { font-size:13px; line-height:1.65; white-space:pre-line; }
+.board-card-meta { display:flex; justify-content:space-between; gap:12px; font-size:12px; color:#c6d6eb; }
+.board-card .board-worker { color:#9fd5c1; }
+.board-card .board-issue { color:#ffd1a8; }
+.board-card summary { cursor:pointer; font-size:13px; color:#c6d6eb; padding:8px 0; }
+.board-card dt { font-size:12px; font-weight:600; color:#d4dfef; margin-top:12px; }
+.board-card dd { margin:4px 0; }
+.board-card time { display:block; font-size:11px; color:#b8c4d5; margin-top:14px; }
+.board-card pre { white-space:pre-wrap; font-size:12px; }
+.board-empty,.board-sync { color:#bdcadc; font-size:13px; line-height:1.6; }
+.task-board:focus-visible,.board-list:focus-visible { outline:2px solid #9ec7ff; outline-offset:2px; }

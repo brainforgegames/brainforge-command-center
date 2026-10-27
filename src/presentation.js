@@ -1,10 +1,10 @@
 import { istParts } from "./domain.js";
 export const statusLabels = {
-  queued: "Planned",
+  queued: "To do",
   running: "In progress",
-  review: "Ready for review",
-  blocked: "Issue to resolve",
-  done: "Completed",
+  review: "In review",
+  blocked: "Blockers",
+  done: "Done",
 };
 export const priorityProjects = (projects) => [...projects].sort((a,b) => {
   const active = p => p.enabled && Number(p.weight) > 0;

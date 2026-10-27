@@ -39,6 +39,7 @@ test('new cloud owner decisions are not overwritten by pending offline results',
 test('settings and projects flow down only, and successful local task results flow up',()=>fixture(async({file,db,cloud})=>{
  await db.doc('settings/global').update({workerEnabled:false});await db.doc('projects/a').update({weight:3});await db.doc('tasks/one').update({status:'review'});
  const result=await syncOnce(cloud,file);assert.equal(result.replayed,3);
+ assert.ok((await readLocalState(file)).sync.lastSuccessAt>0);
  assert.equal(cloud.values.get('settings/global').workerEnabled,true);assert.equal(cloud.values.get('projects/a').weight,100);assert.equal(cloud.values.get('tasks/one').status,'review');
  assert.equal((await readLocalState(file)).documents['projects/a'].weight,100);
 }));
@@ -48,6 +49,18 @@ test('quota retains the outbox; authentication errors fail closed',()=>fixture(a
  cloud.fail(Object.assign(Error('Quota exceeded'),{code:8}));assert.equal((await syncOnce(cloud,file)).status,'deferred');assert.deepEqual(await readLocalState(file),before);
  cloud.fail(Object.assign(Error('Denied'),{code:7}));await assert.rejects(syncOnce(cloud,file),e=>e.offlineSecurityFailure===true);
  assert.deepEqual(await readLocalState(file),before);
+}));
+
+test('quarantined conflicts never advance the last successful sync on a later retry',()=>fixture(async({file,db,cloud})=>{
+ await db.doc('tasks/one').update({status:'review',result:'Saved draft'});
+ cloud.values.get('tasks/one').dependencies=['new-owner-dependency'];
+ assert.equal((await syncOnce(cloud,file,{now:100})).status,'conflict');
+ assert.equal((await syncOnce(cloud,file,{now:200})).status,'conflict');
+ const saved=await readLocalState(file);
+ assert.equal(saved.sync.lastSuccessAt,undefined);
+ assert.deepEqual(saved.documents['tasks/one'].dependencies,['new-owner-dependency']);
+ assert.equal(saved.documents['tasks/one'].result,'Saved draft');
+ assert.equal(saved.outbox.length,1);
 }));
 
 test('refresh after lost acknowledgement does not block an already mirrored task',()=>fixture(async({file,db,cloud})=>{
@@ -101,4 +114,14 @@ test('analytics aggregation conflicts preserve newer cloud counts and all transa
  const result=await replayOutbox(cloud,file);assert.equal(result.conflicts,1);
  assert.deepEqual(cloud.values.get('analyticsDays/2026-10-27'),{completed:10});assert.equal(cloud.values.has('analyticsCompletions/local-task'),false);
  assert.equal((await readLocalState(file)).outbox.length,1);
+}));
+
+test('successful replay publishes final sync state even with a newer cloud heartbeat',()=>fixture(async({file,db,cloud})=>{
+ await db.doc('tasks/one').update({status:'review',result:'Saved result'});
+ await db.doc('worker/status').set({status:'Older local heartbeat',lastSeen:500,workers:{'lane-1':{status:'Idle',lastSeen:500}}});
+ cloud.values.set('worker/status',{status:'Newest cloud heartbeat',lastSeen:1000,workers:{'lane-2':{status:'Working: newer task',lastSeen:1000}}});
+ const result=await syncOnce(cloud,file,{now:2000});assert.equal(result.status,'synced');
+ const status=cloud.values.get('worker/status');assert.equal(status.lastSeen,1000);assert.equal(status.status,'Newest cloud heartbeat');assert.equal(status.workers['lane-2'].status,'Working: newer task');
+ assert.equal(status.queueSync.pending,0);assert.equal(status.queueSync.lastSuccessAt,2000);assert.equal(status.queueSync.state,'Local queue saved');
+ assert.equal((await readLocalState(file)).outbox.length,0);
 }));

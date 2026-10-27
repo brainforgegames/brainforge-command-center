@@ -76,7 +76,7 @@ test("anonymous and other signed-in accounts cannot read or write", async () => 
 test("admin can manage approved tasks but cannot promote own identity or forge reports", async () => {
   const db = env.authenticatedContext("owner").firestore();
   await assertSucceeds(setDoc(doc(db, "tasks/approved"), task));
-  await assertSucceeds(
+  await assertFails(
     updateDoc(doc(db, "tasks/approved"), { status: "review", updatedAt: 2000 }),
   );
   await assertFails(setDoc(doc(db, "config/admin"), { uid: "stranger" }));

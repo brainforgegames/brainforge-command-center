@@ -31,6 +31,14 @@ test('shared reserved time guides weighted selection and reconciles actual minut
  await lane1.finishSlice('one',3); assert.equal((await lane1.state()).served.a,3);
  await lane1.finishSlice('one',0,true);assert.ok(!(await lane1.state()).claims.one);
 });
+
+test('known checkpoints cannot authorize two runnable tasks in one lane',async()=>{
+ const {db,lane1,add,mappings,now}=setup();add('one');add('two','b');await lane1.claim();await lane1.finishSlice('one',2);
+ assert.equal(await lane1.claim(null,['one']),null);
+ const impostor=new Coordinator(db,'lane-1','new-token',mappings,20,()=>now);
+ assert.equal(await impostor.claim(),null);
+ assert.equal(db.values.get('tasks/two').status,'queued');
+});
 test('Unity serialization and owner tokens fail closed without lease expiration',async()=>{
  const {lane1,lane2,add}=setup();add('one');add('two','b');await lane1.claim();await lane2.claim();
  assert.equal(await lane1.unity('one'),true);assert.equal(await lane2.unity('two'),false);
