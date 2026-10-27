@@ -22,6 +22,19 @@ except (OSError, ValueError):
     retry_at = 0
 if retry_at > time.time():
     raise SystemExit(0)
+# An exhausted queue waits at most five minutes. Never suppress active work,
+# its control checks, analytics recovery, or report publication.
+if args.mode == 'worker':
+    try:
+        checkpoint = json.loads((runtime / 'checkpoint.json').read_text(encoding='utf-8'))
+        idle_until = checkpoint.get('idleRetryAt', 0)
+        now_ms = time.time() * 1000
+        if (checkpoint.get('task') is None and checkpoint.get('analyticsActive') is None
+                and isinstance(idle_until, (int, float))
+                and now_ms < idle_until <= now_ms + 300000):
+            raise SystemExit(0)
+    except (OSError, ValueError, AttributeError):
+        pass
 script = 'report.mjs' if args.mode == 'report' else 'worker.mjs'
 command = [args.node, str(root / 'orchestrator' / script)]
 if args.mode == 'worker':
