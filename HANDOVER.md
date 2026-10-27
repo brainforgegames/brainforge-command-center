@@ -34,3 +34,5 @@ Snapshot: 27 October 2026. All workers, reports and supervisor automation are pa
 - Dashboard navigation now keeps Today, Projects, Analytics, Work board, Reports and Ideas. Retired automation pages return to Today.
 - Today and Reports describe command-only work and records on request. Existing records are preserved.
 - Analytics shows tokens in millions throughout; historical collector data does not automatically include manual chats.
+
+- Analytics now displays tokens only; work-time and completed-task metrics are removed from its controls, totals and details.

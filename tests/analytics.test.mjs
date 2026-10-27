@@ -111,4 +111,6 @@ test('analytics distinguishes unavailable history, empty activity, loading and a
  assert.match(html,/1.93M/); assert.match(html,/1.35M/); assert.match(html,/0.58M/); assert.match(html,/1.00M/);
  assert.doesNotMatch(html,/19,32,318|1,932,318/);
  assert.match(html,/Manual chat usage is not collected automatically/);
+ assert.doesNotMatch(html,/Work time|Tasks completed|<th>Completed<|analytics-metric/);
+ assert.match(html,/analytics-period/);
  });
