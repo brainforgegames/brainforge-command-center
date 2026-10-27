@@ -1,4 +1,5 @@
 import { analyticsView, workerTime } from './analytics.js';
+export const tokenMillions = value => `${(value / 1_000_000).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}M`;
 export function analyticsPage(state, esc, period = 'today', metric = 'time', now = Date.now()) {
   const data = analyticsView(state.analyticsDays, period, now), meta = state.analyticsMeta || {};
   const total = key => data.buckets.reduce((sum, row) => sum + row[key], 0);
@@ -6,7 +7,7 @@ export function analyticsPage(state, esc, period = 'today', metric = 'time', now
   const started = metric === 'completed' ? meta.completionsStartedAt : meta.startedAt;
   const covered = b => started && b.start + (period === 'today' ? 3600000 : 86400000) > started && b.start <= now;
   const value = b => metric === 'time' ? b.milliseconds : metric === 'completed' ? b.completed : b.input + b.output;
-  const format = v => metric === 'time' ? workerTime(v) : v.toLocaleString('en-IN');
+  const format = v => metric === 'time' ? workerTime(v) : metric === 'tokens' ? tokenMillions(v) : v.toLocaleString('en-IN');
   const label = b => !covered(b) ? (b.start > now ? 'Later today' : 'Unavailable history') : metric === 'tokens' && !b.tokenRuns ? 'Tokens unavailable' : format(value(b));
   const max = Math.max(1, ...data.buckets.map(value));
   const options = (items, selected) => items.map(([v, l]) => `<option value="${v}" ${v === selected ? 'selected' : ''}>${l}</option>`).join('');
@@ -16,11 +17,11 @@ export function analyticsPage(state, esc, period = 'today', metric = 'time', now
   const projectValue = p => metric === 'time' ? p.milliseconds : metric === 'completed' ? p.completed : p.input+p.output;
   const ranked = [...data.projects].filter(p => metric !== 'tokens' || p.tokenRuns).sort((a,b)=>projectValue(b)-projectValue(a));
   const projectMax = Math.max(1,...ranked.map(projectValue));
-  return `<div class="analytics-clean">${header}
+  return `<div class="analytics-clean">${header}<p class="muted">Recorded usage only, including historical automation. Manual chat usage is not collected automatically. Token values are shown in millions (M).</p>
     <div class="analytics-kpis">
-      <section><span>Work time</span><strong>${meta.startedAt ? esc(workerTime(data.total)) : '—'}</strong><small>${meta.startedAt ? 'Recorded worker time' : 'Awaiting first run'}</small></section>
+      <section><span>Work time</span><strong>${meta.startedAt ? esc(workerTime(data.total)) : '—'}</strong><small>${meta.startedAt ? 'Historical recorded time' : 'Awaiting first run'}</small></section>
       <section><span>Tasks completed</span><strong>${meta.completionsStartedAt ? total('completed') : '—'}</strong><small>Verified results</small></section>
-      <section><span>Tokens</span><strong>${total('tokenRuns') ? (total('input')+total('output')).toLocaleString('en-IN') : '—'}</strong><small>${total('runs') ? total('tokenRuns')+' of '+total('runs')+' runs measured' : 'Awaiting first run'}</small></section>
+      <section><span>Tokens (millions)</span><strong>${total('tokenRuns') ? tokenMillions(total('input')+total('output')) : '—'}</strong><small>${total('runs') ? total('tokenRuns')+' of '+total('runs')+' runs measured' : 'Awaiting first run'}</small></section>
     </div>
     <div class="analytics-panels">
       <section class="analytics-card analytics-trend"><div class="analytics-card-heading"><h2>${title}</h2><span>${period==='today'?'Hourly':'Daily'}</span></div>
@@ -32,9 +33,9 @@ export function analyticsPage(state, esc, period = 'today', metric = 'time', now
     </div>
     <details class="analytics-details" data-detail-key="analytics-table"><summary>Data details</summary>
       <p>Earlier history is unavailable. New runs appear after they finish. Gaps mean unavailable history, not zero. All dates use IST.</p>
-      <p>Worker time excludes idle time and the daily pause. Parallel workers add their time separately. Tokens include input and output; cached input is already included. Missing tokens are not estimated.</p>
+      <p>Historical worker time excludes idle time and the former daily pause. Parallel runs add their time separately. Tokens include input and output; cached input is already included. Missing tokens are not estimated.</p>
       <p>Token coverage: ${total('tokenRuns')}/${total('runs')} runs. ${total('partialRuns')} interrupted runs; ${total('partialTokenRuns')} runs with partial tokens.</p>
       <p>Account plan snapshot: ${state.worker.quota==null?'unavailable':esc(state.worker.quota)+'% used'}. Shared across your account; percentages are never added together.</p>
-      <div class="analytics-table" tabindex="0" role="region" aria-label="Analytics values in IST"><table><caption>Recorded values · IST</caption><thead><tr><th>Period</th><th>Work time</th><th>Completed</th><th>Input</th><th>Output</th><th>Cached input</th><th>Runs measured</th></tr></thead><tbody>${data.buckets.map(b=>`<tr><th scope="row">${esc(b.label)}</th><td>${meta.startedAt&&b.start+(period==='today'?3600000:86400000)>meta.startedAt&&b.start<=now?esc(workerTime(b.milliseconds)):'Unavailable'}</td><td>${meta.completionsStartedAt&&b.start+(period==='today'?3600000:86400000)>meta.completionsStartedAt&&b.start<=now?b.completed:'Unavailable'}</td>${['input','output','cached'].map(k=>`<td>${b.tokenRuns?b[k].toLocaleString('en-IN'):'Unavailable'}</td>`).join('')}<td>${b.tokenRuns}/${b.runs}</td></tr>`).join('')}</tbody></table></div>
+      <div class="analytics-table" tabindex="0" role="region" aria-label="Analytics values in IST"><table><caption>Recorded values · IST</caption><thead><tr><th>Period</th><th>Work time</th><th>Completed</th><th>Input (M)</th><th>Output (M)</th><th>Cached input (M)</th><th>Runs measured</th></tr></thead><tbody>${data.buckets.map(b=>`<tr><th scope="row">${esc(b.label)}</th><td>${meta.startedAt&&b.start+(period==='today'?3600000:86400000)>meta.startedAt&&b.start<=now?esc(workerTime(b.milliseconds)):'Unavailable'}</td><td>${meta.completionsStartedAt&&b.start+(period==='today'?3600000:86400000)>meta.completionsStartedAt&&b.start<=now?b.completed:'Unavailable'}</td>${['input','output','cached'].map(k=>`<td>${b.tokenRuns?tokenMillions(b[k]):'Unavailable'}</td>`).join('')}<td>${b.tokenRuns}/${b.runs}</td></tr>`).join('')}</tbody></table></div>
     </details></div>`;
 }

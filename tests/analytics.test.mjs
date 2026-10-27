@@ -103,3 +103,12 @@ test('analytics distinguishes unavailable history, empty activity, loading and a
   assert.doesNotMatch(analyticsPage({ ...state, analyticsUnavailable: true }, String), /analytics-chart/);
   assert.match(analyticsPage({ ...state, analyticsLoaded: false }, String), /Loading private analytics/);
 });
+
+ test('token values use millions across summary, chart, projects and data details', () => {
+ const now = at('2026-10-27T12:00:00');
+ const state = {projects:[{id:'a',name:'Project A'}],worker:{},analyticsLoaded:true,analyticsMeta:{startedAt:at('2026-10-27T00:00:00')},analyticsDays:[{id:'2026-10-27',rows:[{hour:10,projectId:'a',input:1350031,output:582287,cached:1000000,tokenRuns:1,runs:1}]}]};
+ const html=analyticsPage(state,String,'today','tokens',now);
+ assert.match(html,/1.93M/); assert.match(html,/1.35M/); assert.match(html,/0.58M/); assert.match(html,/1.00M/);
+ assert.doesNotMatch(html,/19,32,318|1,932,318/);
+ assert.match(html,/Manual chat usage is not collected automatically/);
+ });
