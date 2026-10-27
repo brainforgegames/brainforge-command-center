@@ -1,5 +1,5 @@
 import { analyticsView } from './analytics.js';
-export const tokenMillions = value => `${(value / 1_000_000).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}M`;
+export const tokenMillions = value => value > 0 && value < 10_000 ? '<0.01M' : `${(value / 1_000_000).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}M`;
 export function analyticsPage(state, esc, period = 'today', metric = 'tokens', now = Date.now()) {
   const data = analyticsView(state.analyticsDays, period, now), meta = state.analyticsMeta || {};
   const total = key => data.buckets.reduce((sum, row) => sum + row[key], 0);
@@ -19,7 +19,7 @@ export function analyticsPage(state, esc, period = 'today', metric = 'tokens', n
   const projectMax = Math.max(1,...ranked.map(projectValue));
   return `<div class="analytics-clean">${header}<p class="muted">Recorded usage only, including historical automation. Manual chat usage is not collected automatically. Token values are shown in millions (M).</p>
     <div class="analytics-kpis">
-      <section><span>Tokens (millions)</span><strong>${total('tokenRuns') ? tokenMillions(total('input')+total('output')) : '—'}</strong><small>${total('runs') ? total('tokenRuns')+' of '+total('runs')+' runs measured' : 'Awaiting first run'}</small></section>
+      <section><span>Tokens (millions)</span><strong>${total('tokenRuns') ? esc(tokenMillions(total('input')+total('output'))) : '—'}</strong><small>${total('runs') ? total('tokenRuns')+' of '+total('runs')+' runs measured' : 'Awaiting first run'}</small></section>
     </div>
     <div class="analytics-panels">
       <section class="analytics-card analytics-trend"><div class="analytics-card-heading"><h2>${title}</h2><span>${period==='today'?'Hourly':'Daily'}</span></div>
@@ -33,7 +33,6 @@ export function analyticsPage(state, esc, period = 'today', metric = 'tokens', n
       <p>Earlier history is unavailable. New runs appear after they finish. Gaps mean unavailable history, not zero. All dates use IST.</p>
       <p>Tokens include input and output; cached input is already included. Missing tokens are not estimated.</p>
       <p>Token coverage: ${total('tokenRuns')}/${total('runs')} runs. ${total('partialRuns')} interrupted runs; ${total('partialTokenRuns')} runs with partial tokens.</p>
-      <p>Account plan snapshot: ${state.worker.quota==null?'unavailable':esc(state.worker.quota)+'% used'}. Shared across your account; percentages are never added together.</p>
-      <div class="analytics-table" tabindex="0" role="region" aria-label="Analytics values in IST"><table><caption>Recorded values · IST</caption><thead><tr><th>Period</th><th>Input (M)</th><th>Output (M)</th><th>Cached input (M)</th><th>Runs measured</th></tr></thead><tbody>${data.buckets.map(b=>`<tr><th scope="row">${esc(b.label)}</th>${['input','output','cached'].map(k=>`<td>${b.tokenRuns?tokenMillions(b[k]):'Unavailable'}</td>`).join('')}<td>${b.tokenRuns}/${b.runs}</td></tr>`).join('')}</tbody></table></div>
+      <div class="analytics-table" tabindex="0" role="region" aria-label="Analytics values in IST"><table><caption>Recorded values · IST</caption><thead><tr><th>Period</th><th>Input (M)</th><th>Output (M)</th><th>Cached input (M)</th><th>Runs measured</th></tr></thead><tbody>${data.buckets.map(b=>`<tr><th scope="row">${esc(b.label)}</th>${['input','output','cached'].map(k=>`<td>${b.tokenRuns?esc(tokenMillions(b[k])):'Unavailable'}</td>`).join('')}<td>${b.tokenRuns}/${b.runs}</td></tr>`).join('')}</tbody></table></div>
     </details></div>`;
 }

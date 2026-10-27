@@ -99,7 +99,7 @@ test('analytics distinguishes unavailable history, empty activity, loading and a
   const state = { projects: [], worker: {}, analyticsDays: [], analyticsMeta: {}, analyticsLoaded: true };
   const html = analyticsPage(state, s => String(s), 'today', 'tokens', at('2026-10-27T09:00:00'));
   assert.match(html, /Unavailable history/); assert.match(html, /No recorded activity/);
-  assert.match(html, /<caption>/); assert.match(html, /data-analytics-bucket/); assert.match(html, /never added together/);
+  assert.match(html, /<caption>/); assert.match(html, /data-analytics-bucket/); assert.doesNotMatch(html, /Account plan snapshot/);
   assert.doesNotMatch(analyticsPage({ ...state, analyticsUnavailable: true }, String), /analytics-chart/);
   assert.match(analyticsPage({ ...state, analyticsLoaded: false }, String), /Loading private analytics/);
 });
@@ -113,4 +113,9 @@ test('analytics distinguishes unavailable history, empty activity, loading and a
  assert.match(html,/Manual chat usage is not collected automatically/);
  assert.doesNotMatch(html,/Work time|Tasks completed|<th>Completed<|analytics-metric/);
  assert.match(html,/analytics-period/);
+ });
+
+ test('small positive token usage is not displayed as zero',()=>{
+ const state={projects:[],worker:{},analyticsDays:[{id:'2026-10-27',rows:[{hour:1,projectId:'a',input:100,output:50,tokenRuns:1,runs:1}]}],analyticsMeta:{startedAt:at('2026-10-27T00:00:00')},analyticsLoaded:true};
+ assert.match(analyticsPage(state,s=>String(s).replaceAll('<','&lt;'),'today','tokens',at('2026-10-27T09:00:00')),/&lt;0.01M/);
  });

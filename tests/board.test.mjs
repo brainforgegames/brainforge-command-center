@@ -11,7 +11,7 @@ import path from 'node:path';
 test('five lists explicitly map legacy statuses without changing tasks or counting drafts done',()=>{
  const s=initialState();s.tasks=['queued','backlog','ready','draft','running','blocked','review','verify','done','unknown'].map((status,i)=>({id:String(i),projectId:'sikhi-khoj',status}));
  const original=structuredClone(s.tasks), columns=boardColumns(s);
- assert.deepEqual(columns.map(c=>c.label),['To do','In progress','Blockers','In review','Done']);
+ assert.deepEqual(columns.map(c=>c.label),['To do','In progress','Blockers','Needs review','Done']);
  assert.equal(columns.flatMap(c=>c.tasks).length,s.tasks.length);
  assert.deepEqual(columns.find(c=>c.id==='done').tasks.map(t=>t.status),['done']);
  assert.equal(boardStatus({status:'unknown'}),'blocked');assert.deepEqual(s.tasks,original);
@@ -27,9 +27,9 @@ test('project filters and priority order keep parked work visible and last',()=>
 test('cards expose useful task details and never offer status mutation controls',()=>{
  const s=initialState(),t={id:'task',projectId:'sikhi-khoj',status:'review',title:'Useful result',acceptance:'One deliverable',dependencies:['before'],workerLane:'lane-1',history:[{status:'queued'}]};
  const html=boardCard(s,t,v=>String(v??'').replaceAll('<','&lt;'));
- for(const text of ['lane-1','One deliverable','before','Task ID','Technical detail and history','Short result'])assert.ok(html.includes(text));
+ for(const text of ['Manual work','One deliverable','before','Task ID','Technical detail and history','Short result'])assert.ok(html.includes(text));
  assert.ok(!html.includes('draggable'));assert.ok(!html.includes('<button'));
- assert.match(syncLabel(null,'firebase'),/unknown/);
+ assert.match(syncLabel(null,'firebase'),/updated on request/);
 });
 test('board reads the durable queue after restart with IDs, history and pending results intact',async()=>{
  const dir=await mkdtemp(path.join(tmpdir(),'bcc-board-')),file=path.join(dir,'queue.json');
@@ -62,3 +62,12 @@ test('blocked cards show the short owner issue and keep raw diagnostic text in o
  assert.ok(html.includes(raw));assert.ok(html.indexOf(raw)>html.indexOf('Technical detail and history'));
  const fallback=boardCard(s,{id:'blocked',projectId:'sikhi-khoj',status:'blocked',blockedReason:raw},v=>String(v??''));assert.ok(!fallback.split('<details')[0].includes('Long technical diagnostic'));
 });
+
+ test('manual board hides worker telemetry and supplies safe review links',()=>{
+ const s=initialState();s.worker={workers:{'lane-1':{taskId:'a',status:'Working: old task',lastSeen:Date.now()}}};
+ const t={id:'a',projectId:'sikhi-khoj',status:'review',workerLane:'lane-1',pr:'https://github.com/brainforgegames/Sikhi_Khoj/pull/14'};
+ const html=boardCard(s,t,String);
+ assert.match(html,/View the change/);assert.match(html,/rel="noopener noreferrer"/);
+ assert.doesNotMatch(html,/lane-1|Active now|Unassigned/);
+ for(const pr of ['javascript:alert(1)','https://github.com.evil.example/pull/1','https://secret@github.com/a/b']) assert.doesNotMatch(boardCard(s,{...t,pr},String),/View the change/);
+ });
