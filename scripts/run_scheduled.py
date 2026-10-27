@@ -20,8 +20,30 @@ try:
     retry_at = json.loads(cooldown.read_text(encoding='utf-8')).get('retryAt', 0)
 except (OSError, ValueError):
     retry_at = 0
-if retry_at > time.time():
+offline_queue = root / '.local' / 'offline-queue.json'
+if (root / '.local' / 'offline-security-stop.json').exists():
+    raise SystemExit(1)
+if retry_at > time.time() and not offline_queue.exists():
     raise SystemExit(0)
+# Cloud sync is independent from execution. A quota/network failure must never
+# prevent locally queued work. Exclusive launch marker bounds both lanes together.
+if offline_queue.exists() and retry_at <= time.time():
+    sync_gate = root / '.local' / 'sync-next-at.txt'
+    try:
+        next_sync = float(sync_gate.read_text())
+    except (OSError, ValueError):
+        next_sync = 0
+    # One designated lane syncs; both execute work. This avoids two launchers
+    # racing a cloud refresh while retaining existing Windows scheduled jobs.
+    if next_sync <= time.time() and args.mode == 'worker' and args.lane == 'lane-1':
+        sync_gate.write_text(str(time.time() + 300))
+        try:
+            with (root / '.local' / 'sync-stderr.log').open('w', encoding='utf-8') as sync_err:
+                subprocess.run([args.node, str(root / 'orchestrator' / 'sync-local.mjs')],
+                               cwd=root, stdout=subprocess.DEVNULL, stderr=sync_err,
+                               timeout=12, creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
+        except subprocess.TimeoutExpired:
+            pass
 # An exhausted queue waits at most five minutes. Never suppress active work,
 # its control checks, analytics recovery, or report publication.
 if args.mode == 'worker':

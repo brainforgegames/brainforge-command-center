@@ -1,7 +1,7 @@
 import { readFile, mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { database } from "./database.mjs";
+import { runtimeDatabase } from "./runtime-database.mjs";
 import { istParts, makeReport } from "./policy.mjs";
 import { archiveCompletion } from './analytics.mjs';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -14,7 +14,7 @@ if ((await readFile(marker, 'utf8').catch(() => '')).trim() === now.date) proces
 const config = JSON.parse(
   await readFile(path.join(root, "worker.config.json"), "utf8"),
 );
-const db = database(config.firebaseProjectId, config.credentialMode);
+const db = runtimeDatabase(root,config);
 const reportRef = db.doc('reports/' + now.date);
 async function rememberPublished() {
   await mkdir(path.dirname(marker), { recursive: true });

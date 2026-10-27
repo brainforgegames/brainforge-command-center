@@ -37,7 +37,7 @@ for(const scenario of ['daytime','already-local','already-remote','publish'])tes
  if(scenario==='already-local')await writeFile(path.join(root,'.local/last-published-report.txt'),'2026-10-27');
  await writeFile(path.join(root,'orchestrator/policy.mjs'),`export const istParts=()=>({hour:${scenario==='daytime'?5:22},date:'2026-10-27'});export const makeReport=()=>({});`);
  await writeFile(path.join(root,'orchestrator/analytics.mjs'),'export const archiveCompletion=async()=>{};');
- await writeFile(path.join(root,'orchestrator/database.mjs'),`export const database=()=>{console.log('DB_OPEN');return {doc:(id)=>({get:async()=>{console.log('READ '+id);return {exists:${scenario==='already-remote'},data:()=>({})}},create:async()=>console.log('CREATED')}),collection:(id)=>({where(){return this},limit(){return this},get:async()=>{console.log('SCAN '+id);return {docs:[],empty:true}}}),terminate:async()=>{}}};`);
+ await writeFile(path.join(root,'orchestrator/runtime-database.mjs'),`export const runtimeDatabase=()=>{console.log('DB_OPEN');return {doc:(id)=>({get:async()=>{console.log('READ '+id);return {exists:${scenario==='already-remote'},data:()=>({})}},create:async()=>console.log('CREATED')}),collection:(id)=>({where(){return this},limit(){return this},get:async()=>{console.log('SCAN '+id);return {docs:[],empty:true}}}),terminate:async()=>{}}};`);
  const result=spawnSync(process.execPath,[path.join(root,'orchestrator/report.mjs')],{encoding:'utf8'});
  assert.equal(result.status,0,result.stderr);
  assert.equal(result.stdout.includes('DB_OPEN'),!['daytime','already-local'].includes(scenario));
