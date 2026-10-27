@@ -1,5 +1,6 @@
+import { projectAllows, primaryProject, selectScheduledTask } from './scheduling.mjs';
 import { createHash } from 'node:crypto';
-import { selectTask, isPaused } from './policy.mjs';
+import { isPaused } from './policy.mjs';
 export function targetKey(task, mappings) {
   const group=mappings[task.projectId], p=group?.repositories?.[task.target||'app'] || group;
   // Repository identity also prevents alias projects from editing the same checkout.
@@ -7,40 +8,45 @@ export function targetKey(task, mappings) {
 }
 export function eligible(task,projects,settings,now=Date.now()) {
   const p=projects.find(x=>x.id===task.projectId);
-  return !!settings.workerEnabled && !isPaused(new Date(now)) && !!p?.enabled && p.weight>0 && task.approved===true && ['queued','running'].includes(task.status);
+  return !!settings.workerEnabled && !isPaused(new Date(now)) && projectAllows(task,projects,settings) && task.approved===true && ['queued','running'].includes(task.status);
 }
 export function transientCapacity(text) { return /selected model is at capacity|model.*(?:overloaded|at capacity)|server.*overloaded|temporarily unavailable/i.test(text||''); }
 export class Coordinator {
  constructor(db,lane,token,mappings,minutes=20,clock=()=>Date.now()) { Object.assign(this,{db,lane,token,mappings,minutes,clock}); this.ref=db.doc('coordination/runtime'); }
  async state() { return (await this.ref.get()).data() || {}; }
  async claim(resumeId=null, knownIds=[]) {
+  // Promote runnable primary follow-ups before considering parked fallback work.
+  if (!resumeId) {
+   await this.resumeContinuation({primaryOnly:true});
+   await this.recoverBlocked({primaryOnly:true});
+  }
   return this.db.runTransaction(async tx=>{
-   const [cs,ss,ps,ts]=await Promise.all([tx.get(this.ref),tx.get(this.db.doc('settings/global')),tx.get(this.db.collection('projects')),tx.get(this.db.collection('tasks').where('status','in',['queued','running']))]);
+   const [cs,ss,ps,ts]=await Promise.all([tx.get(this.ref),tx.get(this.db.doc('settings/global')),tx.get(this.db.collection('projects')),tx.get(this.db.collection('tasks').where('status','in',['queued','running','blocked','review']))]);
    const c=cs.data()||{}, settings=ss.data()||{}, projects=ps.docs.map(d=>({...d.data(),id:d.id})), tasks=ts.docs.map(d=>({...d.data(),id:d.id}));
    if((c.cooldownUntil||0)>this.clock()) return null;
    c.claims ||= {}; c.served ||= {};
    if (Object.entries(c.claims).some(([id,x])=>x.token===this.token && id!==resumeId && !knownIds.includes(id))) throw Error("Owned claim has no local task checkpoint; inspect before starting another task.");
    const available=tasks.filter(t=>eligible(t,projects,settings,this.clock()) && (!c.claims[t.id] || c.claims[t.id].token===this.token) && !Object.entries(c.claims).some(([id,x])=>x.target===targetKey(t,this.mappings)&&id!==t.id));
-   let task=resumeId ? available.find(t=>t.id===resumeId&&c.claims[t.id]?.token===this.token) : selectTask(projects,available.filter(t=>t.status==='queued'&&!c.claims[t.id]),c.served);
+   let task=resumeId ? available.find(t=>t.id===resumeId&&c.claims[t.id]?.token===this.token) : selectScheduledTask(projects,available.filter(t=>t.status==='queued'&&!c.claims[t.id]),c.served,settings,tasks);
    if(!task) return null;
    const previous=c.claims[task.id];
    if(previous?.reserved) throw Error('Previous worker slice has not been reconciled; inspect checkpoint before resuming.');
    const reservation=this.minutes;
-   c.claims[task.id]={lane:this.lane,token:this.token,target:targetKey(task,this.mappings),reserved:reservation,accountedMinutes:0,startedAt:this.clock(),lastSeen:this.clock()};
+   c.claims[task.id]={selectionMode:primaryProject(projects.find(p=>p.id===task.projectId))?'primary':'owner-fallback',lane:this.lane,token:this.token,target:targetKey(task,this.mappings),reserved:reservation,accountedMinutes:0,startedAt:this.clock(),lastSeen:this.clock()};
    for(const key of [task.projectId,`${task.projectId}:${task.target||'app'}`]) c.served[key]=(c.served[key]||0)+reservation;
    tx.set(this.ref,c);
    tx.update(this.db.doc('tasks/'+task.id),{status:'running',workerLane:this.lane,updatedAt:this.clock()});
    return task;
   });
  }
- async recoverBlocked() {
+ async recoverBlocked({primaryOnly=false}={}) {
   return this.db.runTransaction(async tx=>{
    const [cs,ss,ps,ts]=await Promise.all([tx.get(this.ref),tx.get(this.db.doc('settings/global')),tx.get(this.db.collection('projects')),tx.get(this.db.collection('tasks').where('status','==','blocked'))]);
    const c=cs.data()||{}, settings=ss.data()||{}, now=this.clock(), projects=ps.docs.map(d=>({...d.data(),id:d.id}));
    if(!settings.workerEnabled || isPaused(new Date(now)) || (c.cooldownUntil||0)>now) return null;
    const candidates=ts.docs.map(d=>({...d.data(),id:d.id})).filter(t=>{
-    const p=projects.find(p=>p.id===t.projectId), e=t.evidence?.at(-1), recovery=t.automaticRecovery||{};
-    return t.status==='blocked' && t.approved===true && p?.enabled && p.weight>0 && !t.ownerUpdate?.needsOwner && !c.claims?.[t.id]
+    const e=t.evidence?.at(-1), recovery=t.automaticRecovery||{};
+    return t.status==='blocked' && t.approved===true && (!primaryOnly || primaryProject(projects.find(p=>p.id===t.projectId))) && projectAllows(t,projects,settings) && !t.ownerUpdate?.needsOwner && !c.claims?.[t.id]
       && !Object.values(c.claims||{}).some(x=>x.target===targetKey(t,this.mappings))
       && (recovery.attempts||0)<2 && now-(t.updatedAt||0)>=300000
       && e?.passed===false && ['timeout','missing_dependency','process_access'].includes(e.category);
@@ -53,14 +59,14 @@ export class Coordinator {
  }
  // A human/supervisor-authored continuation is a concrete remaining action, not
  // an inferred retry of a completed draft. Keep the task identity and worktree.
- async resumeContinuation() {
+ async resumeContinuation({primaryOnly=false}={}) {
   return this.db.runTransaction(async tx=>{
    const [cs,ss,ps,ts]=await Promise.all([tx.get(this.ref),tx.get(this.db.doc('settings/global')),tx.get(this.db.collection('projects')),tx.get(this.db.collection('tasks').where('status','in',['blocked','review']))]);
    const c=cs.data()||{}, settings=ss.data()||{}, now=this.clock(), projects=ps.docs.map(d=>({...d.data(),id:d.id}));
    if(!settings.workerEnabled || isPaused(new Date(now)) || (c.cooldownUntil||0)>now) return null;
    const candidates=ts.docs.map(d=>({...d.data(),id:d.id})).filter(t=>{
-    const p=projects.find(p=>p.id===t.projectId), next=t.continuation, history=t.continuationHistory||{};
-    return ['blocked','review'].includes(t.status) && t.approved===true && p?.enabled && p.weight>0
+    const next=t.continuation, history=t.continuationHistory||{};
+    return ['blocked','review'].includes(t.status) && t.approved===true && (!primaryOnly || primaryProject(projects.find(p=>p.id===t.projectId))) && projectAllows(t,projects,settings)
      && (!t.ownerUpdate?.needsOwner || next?.independentOfOwner===true) && !c.claims?.[t.id]
      && !Object.values(c.claims||{}).some(x=>x.target===targetKey(t,this.mappings))
      && next?.approved===true && typeof next.id==='string' && /^[a-zA-Z0-9_-]{1,100}$/.test(next.id)

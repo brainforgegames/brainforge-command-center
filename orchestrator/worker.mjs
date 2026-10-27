@@ -1,4 +1,5 @@
 import { runHandoffs } from "./handoff.mjs";
+import { selectScheduledTask, projectAllows } from "./scheduling.mjs";
 import { verificationRetry } from "./recovery.mjs";
 import { recordRun, observedUsage, sessionUsage } from "./analytics.mjs";
 import { acquireLaneLock } from "./lane-lock.mjs";
@@ -21,7 +22,6 @@ import { spawn } from "node:child_process";
 import {
   isPaused,
   nextPause,
-  selectTask,
   classifyFailure,
   retryAt,
 } from "./policy.mjs";
@@ -304,7 +304,7 @@ async function tick() {
   cp.served = shared.served || cp.served;
   cp.nextAttemptAt = Math.max(cp.nextAttemptAt || 0, shared.cooldownUntil || 0);
   if (dry) {
-    const task = selectTask(s.projects, s.tasks, cp.served);
+    const task = selectScheduledTask(s.projects,s.tasks,cp.served,s.settings);
     console.log(
       JSON.stringify({
         localEnabled: cfg.enabled,
@@ -353,8 +353,7 @@ async function tick() {
   cp.suspended ||= {};
   if (cp.task) {
     const current = s.tasks.find(t=>t.id===cp.task.id);
-    const project = s.projects.find(p=>p.id===current?.projectId);
-    if (current?.status === "running" && (!project?.enabled || project.weight<=0)) {
+    if (current?.status === "running" && !projectAllows(current,s.projects,s.settings)) {
       cp.suspended[cp.task.id] = cp.task; cp.task = null; await checkpoint();
     }
   }
@@ -389,11 +388,10 @@ async function tick() {
     if (continued) { await status("Queued the next approved implementation step"); return true; }
     const recovered = await coordination.recoverBlocked();
     if (recovered) { await status("Queued automatic recovery of a saved draft"); return true; }
-    const unfinishedImplementation = s.tasks.some(t => t.approved && t.kind !== "research" && t.status !== "done" && s.projects.some(p => p.id === t.projectId && p.enabled && p.weight > 0));
-    if (s.settings.idleResearchEnabled && !unfinishedImplementation) {
+    if (s.settings.idleResearchEnabled) {
       let created = 0;
       const date = istParts().date;
-      for (const p of s.projects.filter((p) => p.enabled && p.weight > 0)) {
+      for (const p of s.projects.filter((p) => projectAllows({projectId:p.id,kind:"research"},s.projects,s.settings))) {
         const mapping =
           cfg.projects[p.id]?.repositories?.app || cfg.projects[p.id];
         if (!mapping?.path || !mapping.repository) continue;
@@ -426,10 +424,10 @@ async function tick() {
       }
       if (created) {
         await status("Queued bounded daily improvement research");
-        return;
+        return true;
       }
     }
-    await status(unfinishedImplementation ? "Waiting for a task handoff · unfinished work remains" : "Ready · approved work is complete");
+    await status("Idle · no approved eligible tasks");
     return;
   }
   const projectGroup = cfg.projects[task.projectId];
