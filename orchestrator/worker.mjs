@@ -29,6 +29,7 @@ import {
 import { readQuota } from "./quota.mjs";
 import { prepareUnity } from "./unity.mjs";
 import { runtimeDatabase } from "./runtime-database.mjs";
+import {recordIncident,resolveIncident} from './incidents.mjs';
 import {
   canonicalRemote,
   expectedRemote,
@@ -142,6 +143,10 @@ async function status(value) {
   lastStatus = value;
   await coordination.status(value, { taskId: cp.task?.id || null, projectId: cp.task?.projectId || null,
     quota: quota?.usedPercent ?? null, nextAttemptAt: cp.nextAttemptAt || null });
+}
+async function alertSupervisor(message,taskId=cp.task?.id||null,category='worker-error') {
+  try { await recordIncident(root,{lane,taskId,category,message}); }
+  catch(error) { console.error('Supervisor alert could not be saved: '+error.message); }
 }
 
 function command(
@@ -611,6 +616,7 @@ async function tick() {
       await status("Checkpointed · waiting for plan limit reset");
       return;
     }
+    await alertSupervisor(`Worker ${kind}; inspect preserved run log.`,task.id);
     await db.doc("tasks/" + task.id).update({
       status: "blocked",
       blockedReason: `Worker ${kind}; inspect local run log and resolve before requeuing.`,
@@ -639,6 +645,7 @@ async function tick() {
     )
       throw Error("Invalid structured result");
   } catch {
+    await alertSupervisor('Worker result could not be validated; checkpoint preserved.',task.id,'invalid-result');
     await db.doc("tasks/" + task.id).update({
       status: "blocked",
       blockedReason:
@@ -649,6 +656,7 @@ async function tick() {
     return;
   }
   if (result.status === "blocked") {
+    await alertSupervisor(result.summary,task.id,result.ownerUpdate.needsOwner?'owner-input':'task-blocked');
     await db.doc("tasks/" + task.id).update({
       status: "blocked",
       blockedReason: result.summary,
@@ -891,6 +899,7 @@ async function tick() {
   cp.retryReason = null;
   await checkpoint();
   await status("Ready for review");
+  await resolveIncident(root,lane,{taskId:task.id,progressAt:Date.now(),evidence:{kind:'task-completed',detail:'Task output saved for review after required checks.'}}).catch(()=>{});
 }
 try {
   do {
@@ -900,6 +909,7 @@ try {
       advance = await tick() === true;
     } catch (e) {
       console.error(e.message);
+      if (!(e instanceof ControlPause)) await alertSupervisor(e.message,cp.task?.id||null,'orchestrator-error');
       const controlled = e instanceof ControlPause || (activeClaim && await shouldStopWork());
       if (!controlled && cp.task && !isPaused(new Date()) && await coordination.owns(cp.task.id)) {
         try {

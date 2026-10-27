@@ -33,3 +33,4 @@ Recorded from the owner's direct instructions through 27 October 2026. Read this
 - Analytics should be uncluttered with filters, meaningful charts, time/token and completion breakdowns. Never invent usage history. Use verified completion recording for finished tasks.
 - Feedback happens in chat. Ask only specific questions genuinely requiring the owner; do other eligible work meanwhile.
 - Do not claim continuous/autonomous work based on instructions alone. Verify actual processes, task progress, handoffs and outage recovery. Report failures honestly.
+- Worker errors must create a durable local incident independent of BCC. Known transient errors may retry within a bound; unresolved incidents require supervisor diagnosis. Resolve an incident only after newer matching task progress is verified, never from process startup or a heartbeat. Five-minute supervisor polling is a fallback; direct event-triggered supervisor wakeup remains unfinished until tested.

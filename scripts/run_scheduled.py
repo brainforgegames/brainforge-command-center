@@ -67,6 +67,25 @@ with (runtime / f'{args.mode}-stdout.log').open('w', encoding='utf-8') as out, (
     result = subprocess.run(command, cwd=root, stdout=out, stderr=err,
                             creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
 error_text = (runtime / f'{args.mode}-stderr.log').read_text(encoding='utf-8')
+if args.mode == 'worker' and result.returncode != 0:
+    # Independent local alert path also catches failures before worker startup.
+    # Raw logs stay local; the incident writer sanitizes its small summary.
+    try:
+        alert = subprocess.run([args.node, str(root / 'orchestrator' / 'launcher-incident.mjs'),
+                                str(root), args.lane or 'legacy'],
+                               input=json.dumps({'message': error_text[-4000:]}),
+                               capture_output=True, text=True, timeout=15,
+                               creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
+        recovery = json.loads(alert.stdout) if alert.returncode == 0 else {}
+        if recovery.get('retry'):
+            time.sleep(2)
+            with (runtime / 'worker-stdout.log').open('a', encoding='utf-8') as out, (runtime / 'worker-stderr.log').open('a', encoding='utf-8') as err:
+                result = subprocess.run(command, cwd=root, stdout=out, stderr=err,
+                                        creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
+            # Alert remains pending until actual task progress is verified.
+    except (OSError, ValueError, subprocess.TimeoutExpired):
+        # Original error log is retained for independent supervisor inspection.
+        pass
 if 'Quota exceeded' in error_text:
     cooldown.write_text(json.dumps({'retryAt': time.time() + 1800,
                                    'reason': 'Database quota; preserve checkpoints and retry automatically.'}), encoding='utf-8')
