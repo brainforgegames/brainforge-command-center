@@ -54,3 +54,11 @@ test('board orders projects by saved share before task priority and labels exten
  assert.deepEqual(boardColumns(s)[0].tasks.map(t=>t.id),['sikhi-high','sikhi-low','bcc-high','parked']);
  const html=boardCard(s,s.tasks[0],v=>String(v??''));assert.match(html,/Priority 9/);assert.ok(!html.includes('Priority unset'));
 });
+
+test('blocked cards show the short owner issue and keep raw diagnostic text in optional details',()=>{
+ const s=initialState(),raw='Long technical diagnostic '.repeat(30);
+ const html=boardCard(s,{id:'blocked',projectId:'sikhi-khoj',status:'blocked',blockedReason:raw,ownerUpdate:{issue:'Sign-in needs another check.'}},v=>String(v??''));
+ const summary=html.split('<details')[0];assert.match(summary,/Sign-in needs another check\./);assert.ok(!summary.includes('Long technical diagnostic'));
+ assert.ok(html.includes(raw));assert.ok(html.indexOf(raw)>html.indexOf('Technical detail and history'));
+ const fallback=boardCard(s,{id:'blocked',projectId:'sikhi-khoj',status:'blocked',blockedReason:raw},v=>String(v??''));assert.ok(!fallback.split('<details')[0].includes('Long technical diagnostic'));
+});
