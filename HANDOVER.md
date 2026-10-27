@@ -36,3 +36,17 @@ Snapshot: 27 October 2026. All workers, reports and supervisor automation are pa
 - Analytics shows tokens in millions throughout; historical collector data does not automatically include manual chats.
 
 - Analytics now displays tokens only; work-time and completed-task metrics are removed from its controls, totals and details.
+
+## Work-board records reconciled (27 October)
+
+- Owner-requested cloud/local cleanup: 7 obsolete or superseded tasks deleted at the owner's request; 69 visible records, 30 open, none running. Merged Sikhi Khoj results checked against GitHub before status updates.
+- Private before-snapshots and cleanup plan are in .local. Historical offline outbox is preserved; reconcile against current cloud tasks before any future replay to avoid restoring stale records.
+- PR31 merged and published after the owner explicitly requested publication; live token-only Analytics verified. No automation restarted.
+
+## Prepared, not published: manual review clarity
+
+- Review labels read Needs review. Board cards show manual work, with safe change links in task details, and ignore old worker telemetry.
+- Fixed scheduled-report empty text, removed stale account quota from Analytics, and show small positive token values as <0.01M.
+- Focused regressions added; full 137-test suite and production build pass. No deployment authorized for this change.
+
+- Follow-up wording: Today uses Daily report, with no 10 PM schedule; removed the unreachable legacy Settings markup containing the old daily timetable. Still unpublished.

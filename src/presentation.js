@@ -2,7 +2,7 @@ import { istParts } from "./domain.js";
 export const statusLabels = {
   queued: "To do",
   running: "In progress",
-  review: "In review",
+  review: "Needs review",
   blocked: "Blockers",
   done: "Done",
 };
