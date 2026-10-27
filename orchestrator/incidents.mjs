@@ -79,7 +79,7 @@ export async function resolveIncident(root,lane,{taskId=null,progressAt,evidence
  return update(location(root,lane),current=>{
   const kind=evidence?.kind;
   const actual=(['task-progress','task-completed'].includes(kind)||(kind==='checkpoint-saved'&&evidence.changed===true))&&typeof evidence?.detail==='string'&&!!clean(evidence.detail);
-  const matches=current&&(current.taskId===null||current.taskId===taskIdentifier(taskId));
+  const matches=current&&((current.taskId!==null&&current.taskId!=='[redacted]'&&current.taskId===taskIdentifier(taskId))||evidence?.incidentFingerprint===current.fingerprint);
   if(!current||current.state!=='pending'||!matches||!actual||!Number.isFinite(progressAt)||progressAt<=current.lastSeen)
    return {result:{resolved:false,incident:current}};
   const value={...current,state:'recovered',recoveredAt:progressAt,recovery:{kind,detail:clean(evidence.detail),taskId:taskIdentifier(taskId)}};
