@@ -50,3 +50,5 @@ Snapshot: 27 October 2026. All workers, reports and supervisor automation are pa
 - Focused regressions added; full 137-test suite and production build pass. No deployment authorized for this change.
 
 - Follow-up wording: Today uses Daily report, with no 10 PM schedule; removed the unreachable legacy Settings markup containing the old daily timetable. Still unpublished.
+
+- Owner requested removing the full Today introduction banner; Today now begins with its record counters.

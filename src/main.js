@@ -133,8 +133,7 @@ function briefItems(rows, field, fallback) {
 function today() {
   const s = studioSummary(state);
   const next = [...s.active, ...s.planned, ...s.checking, ...s.issues].filter(t => state.projects.some(p => p.id === t.projectId && p.enabled && p.weight > 0));
-  return `<section class="hero"><div><span class="eyebrow">YOUR DAILY STUDIO BRIEF</span><h2>Your studio.<br>A clear next move.</h2><p>What changed, what needs attention, and what happens next.</p></div><div class="live-card"><strong>Manual work / records on request</strong><p>New work starts with your command in chat. BCC keeps the progress and results.</p><small>Automation is paused. No scheduled updates.</small><button class="text" data-page="Reports">Read daily reports</button></div></section>
-    <div class="stats">
+  return `<div class="stats">
       <button class="stat-card" data-work-view="today"><span class="stat-icon" aria-hidden="true">${icon("reports")}</span><small>Updates today</small><strong>${s.today.length}</strong><span>Changed today · includes drafts</span><b>See all ${s.today.length} updates →</b></button>
       <button class="stat-card" data-work-view="open"><span class="stat-icon" aria-hidden="true">${icon("tasks")}</span><small>Open work</small><strong>${s.open.length}</strong><span>${s.active.length} underway · ${s.planned.length} planned<br>${s.checking.length} need review · ${s.issues.length} need fixes${s.parked.length ? `<br>${s.parked.length} saved on paused projects` : ""}</span><b>See all ${s.open.length} work items →</b></button>
       <button class="stat-card" data-page="Reports"><span class="stat-icon" aria-hidden="true">${icon("clock")}</span><small>Daily report</small><strong>${state.reports.filter(reportVisible).length}</strong><span>Added on request</span><b>Read the reports →</b></button>
