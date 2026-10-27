@@ -2,7 +2,7 @@ import { createNavigation } from "./navigation.js";
 import { boardColumns, boardCard, syncLabel } from './board.js';
 import "./style.css";
 import { tokenMillions, analyticsPage } from './analytics-page.js';
-import { analyticsView, workerTime } from './analytics.js';
+import { analyticsView } from './analytics.js';
 import "./design.css";
 import { icon } from "./icons.js";
 import { ideaRows, ideaCards, ideasPage, ideaDialog } from "./ideas.js";
@@ -29,7 +29,7 @@ let state = initialState(),
   projectFilter = "all",
   statusFilter = "all",
   workView = "all";
-let analyticsPeriod = 'today', analyticsMetric = 'time';
+let analyticsPeriod = 'today';
 const root = document.querySelector("#app");
 let allocationDraft = null,
   allocationBusy = false;
@@ -198,7 +198,7 @@ function render() {
       ["Reports", "▤"],
       ["Ideas", "◇"],
     ];
-  root.innerHTML = `<aside class="${menu ? "open" : ""}"><a class="brand" href="#" data-page="Today"><span class="brand-mark">${icon("brand")}</span><div>BCC<small>Brainforge Command Center</small></div></a><small class="nav-label">YOUR STUDIO</small><nav aria-label="Main navigation">${nav.map(([label]) => `<button data-page="${label}" class="${page === label ? "active" : ""}" ${page === label ? 'aria-current="page"' : ""}><span>${navIcon(label)}</span>${label}${label === "Your help" && s.questions.length ? `<b class="nav-count">${s.questions.length}</b>` : ""}</button>`).join("")}</nav><div class="sidebar-foot"><span class="dot"></span> Thoughtful progress<small>Quality over speed. Always.</small></div></aside>${menu ? '<button class="nav-backdrop" id="close-menu" aria-label="Close navigation"></button>' : ""}<div class="workspace"><header><button id="menu" class="menu" aria-label="Toggle navigation" aria-expanded="${menu}">☰</button><span class="workspace-label">${icon("workspace")}<span>Brainforge <b>/ ${esc(page)}</b></span></span><div>${badge(mode === "demo" ? "Preview" : "Private workspace")}<button id="auth">${mode === "local" ? "Local view" : mode === "demo" ? "Demo" : auth ? "Sign out" : "Sign in"}</button></div></header><main><div class="page-heading"><div><p class="eyebrow">BRAINFORGE COMMAND CENTER</p><h1 class="page-title">${page === "Today" ? "Today" : esc(page === "Work board" ? ({today:"Updates today",open:"Open work",all:"All work"}[workView]) : page)}</h1></div><span class="muted">${esc(when(Date.now()))}</span></div>${mode === "demo" ? '<div class="demo-banner">Design preview · Sample data only. Your live workspace is separate.</div>' : ""}${gated ? `<section class="panel sign-in"><span class="monogram">BF</span><h2>Your studio, privately.</h2><p>${esc(auth?.error || "Sign in with your Brainforge admin Google account to see progress and plans.")}</p><button id="login">Sign in with Google</button></section>` : ({ Today: today, Analytics: () => analyticsPage(state, esc, analyticsPeriod, analyticsMetric), Projects: projectsPage, "Work board": workBoard, Reports: reports, Ideas: ideas }[page] || today)()}</main><footer>Brainforge Games <span>Clear plans. Thoughtful progress.</span></footer></div><div id="toast" role="status"></div>`;
+  root.innerHTML = `<aside class="${menu ? "open" : ""}"><a class="brand" href="#" data-page="Today"><span class="brand-mark">${icon("brand")}</span><div>BCC<small>Brainforge Command Center</small></div></a><small class="nav-label">YOUR STUDIO</small><nav aria-label="Main navigation">${nav.map(([label]) => `<button data-page="${label}" class="${page === label ? "active" : ""}" ${page === label ? 'aria-current="page"' : ""}><span>${navIcon(label)}</span>${label}${label === "Your help" && s.questions.length ? `<b class="nav-count">${s.questions.length}</b>` : ""}</button>`).join("")}</nav><div class="sidebar-foot"><span class="dot"></span> Thoughtful progress<small>Quality over speed. Always.</small></div></aside>${menu ? '<button class="nav-backdrop" id="close-menu" aria-label="Close navigation"></button>' : ""}<div class="workspace"><header><button id="menu" class="menu" aria-label="Toggle navigation" aria-expanded="${menu}">☰</button><span class="workspace-label">${icon("workspace")}<span>Brainforge <b>/ ${esc(page)}</b></span></span><div>${badge(mode === "demo" ? "Preview" : "Private workspace")}<button id="auth">${mode === "local" ? "Local view" : mode === "demo" ? "Demo" : auth ? "Sign out" : "Sign in"}</button></div></header><main><div class="page-heading"><div><p class="eyebrow">BRAINFORGE COMMAND CENTER</p><h1 class="page-title">${page === "Today" ? "Today" : esc(page === "Work board" ? ({today:"Updates today",open:"Open work",all:"All work"}[workView]) : page)}</h1></div><span class="muted">${esc(when(Date.now()))}</span></div>${mode === "demo" ? '<div class="demo-banner">Design preview · Sample data only. Your live workspace is separate.</div>' : ""}${gated ? `<section class="panel sign-in"><span class="monogram">BF</span><h2>Your studio, privately.</h2><p>${esc(auth?.error || "Sign in with your Brainforge admin Google account to see progress and plans.")}</p><button id="login">Sign in with Google</button></section>` : ({ Today: today, Analytics: () => analyticsPage(state, esc, analyticsPeriod), Projects: projectsPage, "Work board": workBoard, Reports: reports, Ideas: ideas }[page] || today)()}</main><footer>Brainforge Games <span>Clear plans. Thoughtful progress.</span></footer></div><div id="toast" role="status"></div>`;
   if (selectedIdea) {
     const current = ideaRows(state.ideas || []).find(v=>v.id===selectedIdea);
     if (current) root.insertAdjacentHTML("beforeend",ideaDialog(current,esc,ideaAlternate));
@@ -317,12 +317,11 @@ function bind() {
       }
     });
   document.querySelector('#analytics-period')?.addEventListener('change', e => { analyticsPeriod = e.target.value; render(); document.querySelector('#analytics-period')?.focus(); });
-  document.querySelector('#analytics-metric')?.addEventListener('change', e => { analyticsMetric = e.target.value; render(); document.querySelector('#analytics-metric')?.focus(); });
   document.querySelectorAll('[data-analytics-bucket]').forEach(button => button.addEventListener('click', () => {
     const b = analyticsView(state.analyticsDays, analyticsPeriod).buckets[Number(button.dataset.analyticsBucket)];
-    const start = analyticsMetric === 'completed' ? state.analyticsMeta?.completionsStartedAt : state.analyticsMeta?.startedAt;
+    const start = state.analyticsMeta?.startedAt;
     const available = start && b.start + (analyticsPeriod === 'today' ? 3600000 : 86400000) > start && b.start <= Date.now();
-    document.querySelector('#analytics-value').textContent = `${b.label} IST: ${!available ? 'Unavailable history or future period' : analyticsMetric === 'time' ? workerTime(b.milliseconds) : analyticsMetric === 'completed' ? `${b.completed} verified completed tasks` : b.tokenRuns ? `${tokenMillions(b.input)} input, ${tokenMillions(b.output)} output, ${tokenMillions(b.cached)} cached input; ${b.tokenRuns}/${b.runs} runs covered` : 'Token usage unavailable'}`;
+    document.querySelector('#analytics-value').textContent = `${b.label} IST: ${!available ? 'Unavailable history or future period' : b.tokenRuns ? `${tokenMillions(b.input)} input, ${tokenMillions(b.output)} output, ${tokenMillions(b.cached)} cached input; ${b.tokenRuns}/${b.runs} runs covered` : 'Token usage unavailable'}`;
   }));
   if (page === "Time split") allocationInputs();
   document.querySelectorAll("[data-page]").forEach(
