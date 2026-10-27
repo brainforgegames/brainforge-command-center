@@ -46,3 +46,7 @@ test('Analytics participates in Back and Forward after the design integration',(
 });
 
 test('retired automation pages return to Today',()=>{ for(const slug of ['time-split','workers','help','screenshots','settings']) assert.equal(parseRoute('#/'+slug).page,'Today'); });
+
+test("old in-progress bookmarks open the To do filter", () => {
+ assert.equal(parseRoute("#/work?status=running").statusFilter,"queued");
+});

@@ -8,13 +8,15 @@ import {mkdtemp,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
 
-test('five lists explicitly map legacy statuses without changing tasks or counting drafts done',()=>{
+test('four lists retain legacy unfinished tasks without changing records or counting drafts done',()=>{
  const s=initialState();s.tasks=['queued','backlog','ready','draft','running','blocked','review','verify','done','unknown'].map((status,i)=>({id:String(i),projectId:'sikhi-khoj',status}));
  const original=structuredClone(s.tasks), columns=boardColumns(s);
- assert.deepEqual(columns.map(c=>c.label),['To do','In progress','Blockers','Needs review','Done']);
+ assert.deepEqual(columns.map(c=>c.label),['To do','Blocked','In review','Done']);
  assert.equal(columns.flatMap(c=>c.tasks).length,s.tasks.length);
  assert.deepEqual(columns.find(c=>c.id==='done').tasks.map(t=>t.status),['done']);
  assert.equal(boardStatus({status:'unknown'}),'blocked');assert.deepEqual(s.tasks,original);
+ assert.equal(boardStatus({status:'running'}),'queued');
+ assert.ok(columns.find(c=>c.id==='queued').tasks.some(t=>t.status==='running'));
  assert.equal(boardColumns(s,'all','all','review').flatMap(c=>c.tasks).length,2);
 });
 test('project filters and priority order keep parked work visible and last',()=>{

@@ -13,7 +13,7 @@ Snapshot: 27 October 2026. All workers, reports and supervisor automation are pa
 
 - Dark dashboard, project pages, count drilldowns, browser Back/Forward support, Screenshots and illustrated Ideas pages.
 - Analytics UI and scheduled-worker usage collection. The collector does NOT cover this supervisor chat or extra review agents, so it is not an account-wide usage meter.
-- Five-column work board: To do, In progress, Blockers, In review, Done (PR28).
+- Four-column manual work board: To do, Blocked, In review, Done. The owner removed In progress on 28 October; legacy unfinished records remain visible under To do.
 - Offline queue and worker alert/context fixes (PR25–29). These exist but do not authorize restarting automation.
 
 ## Current limitations

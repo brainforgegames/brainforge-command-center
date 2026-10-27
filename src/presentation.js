@@ -1,9 +1,9 @@
 import { istParts } from "./domain.js";
 export const statusLabels = {
   queued: "To do",
-  running: "In progress",
-  review: "Needs review",
-  blocked: "Blockers",
+  running: "To do",
+  review: "In review",
+  blocked: "Blocked",
   done: "Done",
 };
 export const priorityProjects = (projects) => [...projects].sort((a,b) => {
@@ -40,7 +40,7 @@ export function ownerView(task) {
         : task.status === "review"
           ? "A first version is ready. I still need to finish my review."
           : task.status === "running"
-            ? "Work is underway. No completed result recorded yet."
+            ? "Saved task. No completed result recorded yet."
             : "No completed result yet."),
     issue:
       u.issue ||

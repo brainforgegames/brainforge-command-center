@@ -2,13 +2,13 @@ import { workRows } from './reading.js';
 import { ownerView, when } from './presentation.js';
 
 export const BOARD_COLUMNS = [
-  ['queued', 'To do'], ['running', 'In progress'], ['blocked', 'Blockers'],
-  ['review', 'Needs review'], ['done', 'Done'],
+  ['queued', 'To do'], ['blocked', 'Blocked'],
+  ['review', 'In review'], ['done', 'Done'],
 ];
 // Display migration only: never rewrite task identities, status or history.
 export function boardStatus(task) {
   return ({queued:'queued', backlog:'queued', ready:'queued', draft:'queued',
-    running:'running', blocked:'blocked', review:'review', verify:'review', done:'done'})[task.status] || 'blocked';
+    running:'queued', blocked:'blocked', review:'review', verify:'review', done:'done'})[task.status] || 'blocked';
 }
 export const parked = (state, task) => !state.projects.some(p => p.id === task.projectId && p.enabled && p.weight > 0);
 export function boardColumns(state, view='all', project='all', status='all', now=Date.now()) {
