@@ -22,7 +22,17 @@ async function locked(file,fn){
  }
  try{return await fn();}finally{await handle.close();const current=JSON.parse(await readFile(lock,'utf8'));if(current.token===token)await unlink(lock);}
 }
-async function save(file,state){const tmp=file+'.'+randomUUID()+'.tmp';const h=await open(tmp,'wx');try{await h.writeFile(JSON.stringify(state));await h.sync();}finally{await h.close();}await rename(tmp,file);}
+export async function replaceSnapshot(tmp,file,move=rename,wait=sleep){
+ // Windows scanners/readers can briefly hold a replacement target. Retain the
+ // transaction lock and original snapshot while retrying; never delete it.
+ for(let attempt=0;;attempt++){
+  try{return await move(tmp,file);}catch(error){
+   if(!['EPERM','EBUSY','EACCES'].includes(error.code)||attempt>=7)throw error;
+   await wait(Math.min(25*2**attempt,400));
+  }
+ }
+}
+async function save(file,state){const tmp=file+'.'+randomUUID()+'.tmp';const h=await open(tmp,'wx');try{await h.writeFile(JSON.stringify(state));await h.sync();}finally{await h.close();}await replaceSnapshot(tmp,file);}
 export async function readLocalState(file){return valid(JSON.parse(await readFile(file,'utf8')));}
 export async function mutateLocalState(file,fn){return locked(file,async()=>{const s=await readLocalState(file);const result=await fn(s);valid(s);await save(file,s);return result;});}
 export async function seedLocalDatabase(file,seed){return locked(file,async()=>{try{await readFile(file);throw Error('Local database already exists; refusing snapshot overwrite.');}catch(e){if(e.code!=='ENOENT')throw e;}const s=valid({version:1,provenance:clone(seed.provenance),documents:clone(seed.documents),outbox:[]});await save(file,s);});}
