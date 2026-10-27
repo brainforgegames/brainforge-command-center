@@ -107,7 +107,7 @@ let activeClaim = null, activeSliceStarted = 0, runtimeDeadline = Infinity;
 class ControlPause extends Error {}
 async function mustContinue() {
   if (Date.now() >= runtimeDeadline) throw new ControlPause("Checkpointed before the scheduled process deadline.");
-  if (!cfg.enabled || (activeClaim && !(await coordination.canRun(activeClaim)))) throw new ControlPause("Work checkpointed: pause, priorities, or shared cooldown changed.");
+  if (isPaused(new Date()) || !cfg.enabled || (activeClaim && !(await coordination.canRun(activeClaim,{cached:true})))) throw new ControlPause("Work checkpointed: pause, priorities, or shared cooldown changed.");
   return true;
 }
 async function shouldStopWork() { try { await mustContinue(); return isPaused(new Date()); } catch { return true; } }
