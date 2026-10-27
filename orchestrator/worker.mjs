@@ -1,3 +1,4 @@
+import { idleWaiting, markQueueIdle } from "./idle-poll.mjs";
 import { runHandoffs } from "./handoff.mjs";
 import { selectScheduledTask, projectAllows } from "./scheduling.mjs";
 import { verificationRetry } from "./recovery.mjs";
@@ -298,6 +299,8 @@ async function prune() {
   }
 }
 async function tick() {
+  if (!dry && idleWaiting(cp)) return;
+  cp.idleRetryAt = 0;
   const now = new Date(),
     s = await readState();
   const shared = await coordination.state();
@@ -427,7 +430,9 @@ async function tick() {
         return true;
       }
     }
-    await status("Idle · no approved eligible tasks");
+    markQueueIdle(cp);
+    await checkpoint();
+    await status("Idle · no approved eligible tasks; checks again within 5 minutes");
     return;
   }
   const projectGroup = cfg.projects[task.projectId];
