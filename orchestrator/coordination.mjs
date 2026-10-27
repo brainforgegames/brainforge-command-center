@@ -82,9 +82,31 @@ export class Coordinator {
   });
  }
  async owns(id) { return (await this.state()).claims?.[id]?.token===this.token; }
- async canRun(id) {
-  const [c,t,s,p]=await Promise.all([this.state(),this.db.doc('tasks/'+id).get(),this.db.doc('settings/global').get(),this.db.collection('projects').get()]);
-  return c.claims?.[id]?.token===this.token && (c.cooldownUntil||0)<=this.clock() && eligible({...t.data(),id},p.docs.map(d=>({...d.data(),id:d.id})),s.data()||{},this.clock());
+ async canRun(id,{cached=false}={}) {
+  // Local pause is immediate even when remote controls were recently checked.
+  if(isPaused(new Date(this.clock()))) return false;
+  this.controlCache ||= new Map(); this.controlPending ||= new Map();
+  const now=this.clock(), previous=this.controlCache.get(id);
+  if(cached && previous && now>=previous.checkedAt && now<previous.expiresAt) return true;
+  if(this.controlPending.has(id)) return this.controlPending.get(id);
+  this.controlCache.delete(id);
+  const check=(async()=>{
+   const checkedAt=this.clock();
+   const [c,t,s]=await Promise.all([this.state(),this.db.doc('tasks/'+id).get(),this.db.doc('settings/global').get()]);
+   const task=t.data();
+   if(!task || typeof task.projectId!=='string' || !task.projectId || task.projectId.includes('/')) return false;
+   const p=(await this.db.doc('projects/'+task.projectId).get()).data();
+   if(!p) return false;
+   const allowed=c.claims?.[id]?.token===this.token && (c.cooldownUntil||0)<=this.clock()
+    && eligible({...task,id},[{...p,id:task.projectId}],s.data()||{},this.clock());
+   // Age from the request start, so slow reads cannot extend the stop bound.
+   if(allowed && this.clock()>=checkedAt && this.clock()<checkedAt+30000)
+    this.controlCache.set(id,{checkedAt,expiresAt:checkedAt+30000});
+   return allowed;
+  })();
+  this.controlPending.set(id,check);
+  try { return await check; }
+  finally { this.controlPending.delete(id); }
  }
  async finishSlice(id,minutes=null,release=false) {
   await this.db.runTransaction(async tx=>{
