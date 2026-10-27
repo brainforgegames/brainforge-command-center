@@ -1,14 +1,30 @@
-import { readFile } from "node:fs/promises";
+import { readFile, mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { database } from "./database.mjs";
 import { istParts, makeReport } from "./policy.mjs";
 import { archiveCompletion } from './analytics.mjs';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const now = istParts();
+// The Windows trigger runs every minute. Reports and their maintenance are daily,
+// so never scan the entire task collection on each daytime invocation.
+if (now.hour < 22) process.exit(0);
+const marker = path.join(root, '.local', 'last-published-report.txt');
+if ((await readFile(marker, 'utf8').catch(() => '')).trim() === now.date) process.exit(0);
 const config = JSON.parse(
   await readFile(path.join(root, "worker.config.json"), "utf8"),
 );
 const db = database(config.firebaseProjectId, config.credentialMode);
+const reportRef = db.doc('reports/' + now.date);
+async function rememberPublished() {
+  await mkdir(path.dirname(marker), { recursive: true });
+  await writeFile(marker, now.date, 'utf8');
+}
+if ((await reportRef.get()).exists) {
+  await rememberPublished();
+  await db.terminate();
+  process.exit(0);
+}
 // Archive explicit verified timestamps before report cleanup; daily buckets never expire.
 const completed = await db.collection('tasks').where('status', '==', 'done').get();
 for (const task of completed.docs) await archiveCompletion(db, { ...task.data(), id: task.id });
@@ -23,7 +39,6 @@ if (!expired.empty) {
   expired.docs.forEach((d) => batch.delete(d.ref));
   await batch.commit();
 }
-const now = istParts();
 if (now.hour >= 22) {
   const ref = db.doc("reports/" + now.date);
   if (!(await ref.get()).exists) {
@@ -37,6 +52,7 @@ if (now.hour >= 22) {
     };
     try {
       await ref.create(makeReport(state, now.date));
+      await rememberPublished();
       console.log("Daily report published.");
     } catch (e) {
       if (e.code !== 6) throw e;
